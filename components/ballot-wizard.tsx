@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, Send, UserRound, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, Send, ShieldCheck, UserRound, X } from 'lucide-react'
 import { exitBallot, submitBallot } from '@/lib/actions/vote'
 import { Button } from '@/components/ui/button'
 import type { Ballot, BallotCandidate } from '@/lib/types'
@@ -12,6 +12,7 @@ const IDLE_MS = 60_000
 export function BallotWizard({ ballot, studentName }: { ballot: Ballot; studentName: string }) {
   const positions = ballot.positions
   const [step, setStep] = useState(0) // positions.length = review
+  const [showWelcome, setShowWelcome] = useState(true)
   const [selections, setSelections] = useState<Record<string, string[]>>({})
   const [toast, setToast] = useState('')
   const [confirmingAbstain, setConfirmingAbstain] = useState(false)
@@ -127,6 +128,62 @@ export function BallotWizard({ ballot, studentName }: { ballot: Ballot; studentN
 
   return (
     <div className="dark bg-aurora min-h-screen bg-background pb-32 text-foreground">
+      {/* welcome */}
+      <AnimatePresence>
+        {showWelcome && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.85, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ type: 'spring', stiffness: 280, damping: 22 }}
+              className="glass w-full max-w-md rounded-3xl bg-popover p-8 text-center sm:p-10"
+            >
+              <motion.div
+                initial={{ scale: 0, rotate: -15 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ delay: 0.15, type: 'spring', stiffness: 300, damping: 18 }}
+                className="mx-auto flex size-20 items-center justify-center rounded-full bg-primary/15"
+              >
+                <ShieldCheck className="size-10 text-primary" />
+              </motion.div>
+              <motion.h2
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25, duration: 0.4 }}
+                className="mt-6 text-3xl font-bold"
+              >
+                Vote Wisely!
+              </motion.h2>
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.35, duration: 0.4 }}
+                className="mt-3 text-sm text-muted-foreground"
+              >
+                Hi {studentName.split(' ')[0]}! Your identity stays private and your ballot is anonymous.
+                Take a moment to choose the candidates who will represent {ballot.election.title} best.
+              </motion.p>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.45, duration: 0.4 }}
+              >
+                <Button size="lg" className="mt-7 h-12 w-full text-base" onClick={() => setShowWelcome(false)}>
+                  Let's Vote <ArrowRight data-icon="inline-end" />
+                </Button>
+              </motion.div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* progress */}
       <header className="sticky top-0 z-20 border-b border-border bg-background/80 px-6 py-4 backdrop-blur-xl">
         <div className="mx-auto flex max-w-4xl items-center justify-between gap-4">
