@@ -20,11 +20,14 @@ function Countdown({ expiresAt }: { expiresAt: string }) {
   }, [])
   const remaining = Math.floor((new Date(expiresAt).getTime() - now) / 1000)
   if (remaining <= 0) return <span className="text-xs font-medium text-destructive">expired</span>
-  const m = Math.floor(remaining / 60)
+  const h = Math.floor(remaining / 3600)
+  const m = Math.floor((remaining % 3600) / 60)
   const s = remaining % 60
+  // Long-lived codes (hours/days) read better as "5h 03m" than a huge m:ss.
+  const label = h > 0 ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}:${String(s).padStart(2, '0')}`
   return (
     <span className={`font-mono text-xs tabular-nums ${remaining < 60 ? 'text-destructive' : 'text-chart-2'}`}>
-      {m}:{String(s).padStart(2, '0')}
+      {label}
     </span>
   )
 }
@@ -190,9 +193,16 @@ export default function CodesPage() {
             <div>
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Code lifetime</label>
               <select className={field} value={minutes} onChange={(e) => setMinutes(Number(e.target.value))}>
-                {[5, 10, 15, 30, 60].map((m) => (
+                {[
+                  { m: 5, label: '5 minutes' },
+                  { m: 10, label: '10 minutes' },
+                  { m: 15, label: '15 minutes' },
+                  { m: 30, label: '30 minutes' },
+                  { m: 60, label: '1 hour' },
+                  { m: 1440, label: '1 day (24 hours)' },
+                ].map(({ m, label }) => (
                   <option key={m} value={m}>
-                    {m} minutes
+                    {label}
                   </option>
                 ))}
               </select>
