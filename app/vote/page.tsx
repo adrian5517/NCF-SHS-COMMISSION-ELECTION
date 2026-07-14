@@ -53,7 +53,7 @@ export default function VotePage() {
               inputMode="text"
               autoComplete="off"
               required
-              placeholder="S-12345"
+              placeholder="12-01010"
               className={`${bigField} uppercase`}
             />
           </div>

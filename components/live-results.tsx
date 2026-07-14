@@ -28,6 +28,8 @@ export interface LiveStats {
           party_list: string
           party_color: string
           photo_url: string | null
+          grade_level: string
+          section: string
           votes: number
         }[]
       }[]
@@ -152,11 +154,11 @@ function CandidateCard({
         <img
           src={candidate.photo_url}
           alt=""
-          className={`rounded-2xl object-cover ${big ? 'size-24' : 'size-16'}`}
+          className={`rounded-2xl object-cover ${big ? 'size-28' : 'size-20'}`}
         />
       ) : (
-        <div className={`flex items-center justify-center rounded-2xl bg-muted ${big ? 'size-24' : 'size-16'}`}>
-          <UserRound className={big ? 'size-10 text-muted-foreground' : 'size-7 text-muted-foreground'} />
+        <div className={`flex items-center justify-center rounded-2xl bg-muted ${big ? 'size-28' : 'size-20'}`}>
+          <UserRound className={big ? 'size-12 text-muted-foreground' : 'size-9 text-muted-foreground'} />
         </div>
       )}
       <p className={`w-full truncate font-semibold ${big ? 'text-lg' : 'text-sm'}`}>{candidate.candidate_name}</p>
@@ -164,6 +166,15 @@ function CandidateCard({
         <span className="inline-block size-2 rounded-full" style={{ background: candidate.party_color }} />
         {candidate.party_list || 'Independent'}
       </p>
+      {(candidate.grade_level || candidate.section) && (
+        <span
+          className={`inline-flex items-center gap-1 rounded-full bg-muted/60 px-2.5 py-0.5 font-medium text-muted-foreground ${
+            big ? 'text-sm' : 'text-xs'
+          }`}
+        >
+          {[candidate.grade_level, candidate.section].filter(Boolean).join(' · ')}
+        </span>
+      )}
       <div className="w-full">
         <div className="flex items-baseline justify-center gap-1.5">
           <motion.span
@@ -203,8 +214,16 @@ function CandidateCard({
   )
 }
 
-export function ResultsBoard({ stats, big = false }: { stats: LiveStats; big?: boolean }) {
-  const [view, setView] = useState<'bars' | 'cards'>('bars')
+export function ResultsBoard({
+  stats,
+  big = false,
+  defaultView = 'bars',
+}: {
+  stats: LiveStats
+  big?: boolean
+  defaultView?: 'bars' | 'cards'
+}) {
+  const [view, setView] = useState<'bars' | 'cards'>(defaultView)
 
   if (!stats.results) {
     return (

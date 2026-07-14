@@ -344,6 +344,7 @@ begin
           select jsonb_agg(jsonb_build_object(
             'id', c.id, 'candidate_name', c.candidate_name, 'party_list', c.party_list,
             'party_color', c.party_color, 'photo_url', c.photo_url,
+            'grade_level', c.grade_level, 'section', c.section,
             'votes', coalesce(vc.votes, 0)
           ) order by coalesce(vc.votes, 0) desc, c.candidate_name)
           from public.candidates c

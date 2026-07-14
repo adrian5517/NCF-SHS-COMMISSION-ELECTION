@@ -76,21 +76,21 @@ begin
 
   -- ---------- Students ----------
   insert into public.students (lrn, full_name, grade_level, section, status) values
-    ('S-10001', 'Juan Bautista', 'Grade 6', 'Rizal', 'pending') returning id into v_student_pending1;
+    ('12-10001', 'Juan Bautista', 'Grade 6', 'Rizal', 'pending') returning id into v_student_pending1;
   insert into public.students (lrn, full_name, grade_level, section, status) values
-    ('S-10002', 'Liza Cruz', 'Grade 6', 'Rizal', 'pending') returning id into v_student_pending2;
+    ('12-10002', 'Liza Cruz', 'Grade 6', 'Rizal', 'pending') returning id into v_student_pending2;
   insert into public.students (lrn, full_name, grade_level, section, status) values
-    ('S-10003', 'Mark Villanueva', 'Grade 6', 'Rizal', 'voted') returning id into v_student_voted1;
+    ('12-10003', 'Mark Villanueva', 'Grade 6', 'Rizal', 'voted') returning id into v_student_voted1;
   insert into public.students (lrn, full_name, grade_level, section, status) values
-    ('S-10004', 'Nina Ramos', 'Grade 6', 'Bonifacio', 'pending') returning id into v_student_pending3;
+    ('12-10004', 'Nina Ramos', 'Grade 6', 'Bonifacio', 'pending') returning id into v_student_pending3;
   insert into public.students (lrn, full_name, grade_level, section, status) values
-    ('S-10005', 'Paolo Garcia', 'Grade 6', 'Bonifacio', 'voted') returning id into v_student_voted2;
+    ('12-10005', 'Paolo Garcia', 'Grade 6', 'Bonifacio', 'voted') returning id into v_student_voted2;
   insert into public.students (lrn, full_name, grade_level, section, status) values
-    ('S-10006', 'Kaye Fernandez', 'Grade 6', 'Bonifacio', 'pending') returning id into v_student_pending4;
+    ('12-10006', 'Kaye Fernandez', 'Grade 6', 'Bonifacio', 'pending') returning id into v_student_pending4;
   insert into public.students (lrn, full_name, grade_level, section, status) values
-    ('S-10007', 'Rico Aquino', 'Grade 5', 'Mabini', 'voted') returning id into v_student_voted3;
+    ('12-10007', 'Rico Aquino', 'Grade 5', 'Mabini', 'voted') returning id into v_student_voted3;
   insert into public.students (lrn, full_name, grade_level, section, status) values
-    ('S-10008', 'Sofia Del Rosario', 'Grade 5', 'Mabini', 'pending') returning id into v_student_pending5;
+    ('12-10008', 'Sofia Del Rosario', 'Grade 5', 'Mabini', 'pending') returning id into v_student_pending5;
 
   -- ---------- Voting codes: active for the pending students ----------
   insert into public.voting_codes (student_id, election_id, code, expires_at, is_used) values

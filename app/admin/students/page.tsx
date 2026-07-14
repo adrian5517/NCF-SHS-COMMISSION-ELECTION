@@ -158,7 +158,7 @@ export default function StudentsPage() {
       </div>
 
       <p className="mt-2 text-xs text-muted-foreground">
-        Columns: Student ID, Name, Grade, Section (e.g. S-12345). Accepts .csv, .xlsx, and .xls files.
+        Columns: Student ID, Name, Grade, Section (e.g. 12-01010). Accepts .csv, .xlsx, and .xls files.
       </p>
       <AnimatePresence>
         {message && (
@@ -191,7 +191,7 @@ export default function StudentsPage() {
             }
           }}
         >
-          <input required placeholder="Student ID (S-12345)" className={field} value={form.lrn} onChange={(e) => setForm({ ...form, lrn: e.target.value })} />
+          <input required placeholder="Student ID (12-01010)" className={field} value={form.lrn} onChange={(e) => setForm({ ...form, lrn: e.target.value })} />
           <input required placeholder="Full name" className={field} value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
           <input required placeholder="Grade level" className={field} value={form.grade_level} onChange={(e) => setForm({ ...form, grade_level: e.target.value })} />
           <input required placeholder="Section" className={field} value={form.section} onChange={(e) => setForm({ ...form, section: e.target.value })} />
