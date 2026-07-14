@@ -34,10 +34,10 @@ export function ProjectorGrid({ stats }: { stats: LiveStats }) {
         return (
           <section key={pos.position_id} className="glass flex min-h-0 flex-col overflow-hidden rounded-2xl p-3">
             <header className="flex items-baseline justify-between gap-2">
-              <h3 className="truncate text-sm font-semibold tracking-tight text-muted-foreground uppercase">
+              <h3 className="truncate text-[clamp(0.875rem,0.95vw,1.3rem)] font-semibold tracking-tight text-muted-foreground uppercase">
                 {pos.position_name}
               </h3>
-              <span className="shrink-0 text-[0.65rem] tracking-wider text-muted-foreground/70 uppercase">
+              <span className="shrink-0 text-[clamp(0.65rem,0.72vw,0.9rem)] tracking-wider text-muted-foreground/70 uppercase">
                 Pick {pos.max_votes}
               </span>
             </header>
@@ -69,16 +69,16 @@ export function ProjectorGrid({ stats }: { stats: LiveStats }) {
 
                       {/* Lower third: name + party read clearly over any photo. */}
                       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-2 pt-6 pb-1.5">
-                        <p className="truncate text-sm leading-tight font-semibold text-white">{c.candidate_name}</p>
+                        <p className="truncate text-[clamp(0.875rem,1vw,1.4rem)] leading-tight font-semibold text-white">{c.candidate_name}</p>
                         <div className="mt-0.5 flex items-center gap-1.5">
                           <span
                             className="size-2 shrink-0 rounded-full"
                             style={{ background: c.party_color || 'var(--chart-1)' }}
                           />
-                          <span className="truncate text-[0.7rem] text-white/70">{c.party_list || 'Independent'}</span>
+                          <span className="truncate text-[clamp(0.7rem,0.78vw,1rem)] text-white/70">{c.party_list || 'Independent'}</span>
                         </div>
                         {(c.grade_level || c.section) && (
-                          <p className="truncate text-[0.65rem] text-white/60">
+                          <p className="truncate text-[clamp(0.65rem,0.72vw,0.9rem)] text-white/60">
                             {[c.grade_level, c.section].filter(Boolean).join(' · ')}
                           </p>
                         )}
@@ -97,7 +97,7 @@ export function ProjectorGrid({ stats }: { stats: LiveStats }) {
                         initial={{ scale: 1.25 }}
                         animate={{ scale: 1 }}
                         transition={{ type: 'spring', stiffness: 400, damping: 16 }}
-                        className="font-display text-lg font-bold tabular-nums"
+                        className="font-display text-[clamp(1.125rem,1.4vw,2.1rem)] font-bold tabular-nums"
                       >
                         {c.votes}
                       </motion.span>
@@ -110,7 +110,7 @@ export function ProjectorGrid({ stats }: { stats: LiveStats }) {
                           style={{ background: c.party_color || 'var(--chart-1)' }}
                         />
                       </div>
-                      <span className="shrink-0 text-[0.7rem] tabular-nums text-muted-foreground">{share}%</span>
+                      <span className="shrink-0 text-[clamp(0.7rem,0.75vw,0.95rem)] tabular-nums text-muted-foreground">{share}%</span>
                     </div>
                   </article>
                 )

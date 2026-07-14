@@ -54,28 +54,31 @@ function ProjectorBoard({ electionId }: { electionId: string }) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/ncf-logo.webp" alt="" className="w-[68vmin] max-w-none opacity-[0.07] mix-blend-screen" />
       </div>
-      <header className="relative z-10 mb-4 flex flex-wrap items-center justify-between gap-4">
-        {/* School crests, centered above the board. */}
-        <div className="pointer-events-none absolute top-0 left-1/2 flex -translate-x-1/2 items-center gap-6">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/gradeschool-logo.png" alt="Naga College Foundation" className="h-16 w-auto object-contain sm:h-20" />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/dlssa-logo.png" alt="La Sallian Schools Supervision Services Association" className="h-16 w-auto object-contain sm:h-20" />
+      {/* 3-column grid keeps the crests centered without ever overlapping the
+          title or stats, and every size scales with the viewport (laptop → big TV). */}
+      <header className="relative z-10 mb-[clamp(0.75rem,1.5vh,1.5rem)] grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <h1 className="truncate text-[clamp(1.25rem,2.4vw,3.25rem)] font-bold">{stats.election.title}</h1>
+          <div className="shrink-0">
+            <StatusPill status={stats.election.status as ElectionStatus} />
+          </div>
         </div>
-        <div className="flex items-center gap-4">
-          <h1 className="text-3xl font-bold sm:text-4xl">{stats.election.title}</h1>
-          <StatusPill status={stats.election.status as ElectionStatus} />
+        <div className="flex items-center justify-self-center gap-[clamp(0.75rem,1.5vw,1.75rem)]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/gradeschool-logo.png" alt="Naga College Foundation" className="h-[clamp(2.75rem,4.5vw,5.5rem)] w-auto object-contain" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/dlssa-logo.png" alt="La Sallian Schools Supervision Services Association" className="h-[clamp(2.75rem,4.5vw,5.5rem)] w-auto object-contain" />
         </div>
-        <div className="flex items-center gap-6">
+        <div className="flex items-center justify-self-end gap-[clamp(1rem,2vw,2.25rem)]">
           <div className="text-right">
-            <p className="font-display text-2xl font-bold tabular-nums">{pct}%</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="font-display text-[clamp(1.25rem,1.9vw,2.5rem)] leading-none font-bold tabular-nums">{pct}%</p>
+            <p className="mt-1 text-[clamp(0.6rem,0.8vw,0.95rem)] text-muted-foreground">
               {voted}/{total} voted
             </p>
           </div>
           <div className="text-right">
-            <p className="font-mono text-2xl tabular-nums">{clock}</p>
-            <p className="text-xs tracking-widest text-muted-foreground uppercase">live · auto-refreshing</p>
+            <p className="font-mono text-[clamp(1.25rem,1.9vw,2.5rem)] leading-none tabular-nums">{clock}</p>
+            <p className="mt-1 text-[clamp(0.55rem,0.7vw,0.85rem)] tracking-widest text-muted-foreground uppercase">live · auto-refreshing</p>
           </div>
         </div>
       </header>
