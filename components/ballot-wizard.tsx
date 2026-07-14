@@ -220,52 +220,68 @@ export function BallotWizard({ ballot, studentName }: { ballot: Ballot; studentN
                   : `Choose up to ${position.max_votes} candidates. (${selectedHere.length}/${position.max_votes} selected)`}
               </p>
 
-              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
                 {position.candidates.map((c, i) => {
                   const selected = selectedHere.includes(c.id)
+                  const accent = c.party_color || 'var(--primary)'
                   return (
                     <motion.button
                       key={c.id}
                       type="button"
-                      initial={{ opacity: 0, y: 12 }}
+                      initial={{ opacity: 0, y: 16 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.04, duration: 0.3, ease: 'easeOut' }}
-                      whileTap={{ scale: 0.97 }}
+                      transition={{ delay: i * 0.05, duration: 0.3, ease: 'easeOut' }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={() => toggle(position.id, c.id, position.max_votes)}
                       aria-pressed={selected}
-                      className={`glass relative flex items-center gap-4 rounded-2xl p-4 text-left transition-colors ${
-                        selected ? 'border-primary ring-4 ring-primary/30' : 'hover:border-primary/40'
+                      className={`glass group relative flex flex-col overflow-hidden rounded-3xl text-left transition-all duration-200 ${
+                        selected ? 'ring-4 ring-primary' : 'hover:-translate-y-1 hover:shadow-xl'
                       }`}
-                      style={{ borderLeftWidth: 4, borderLeftColor: c.party_color || 'var(--border)' }}
                     >
-                      {c.photo_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={c.photo_url} alt="" className="size-20 shrink-0 rounded-2xl object-cover" />
-                      ) : (
-                        <div className="flex size-20 shrink-0 items-center justify-center rounded-2xl bg-muted">
-                          <UserRound className="size-9 text-muted-foreground" />
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <p className="text-lg leading-tight font-semibold">{c.candidate_name}</p>
-                        <p className="mt-0.5 text-sm font-medium" style={{ color: c.party_color }}>
+                      {/* Portrait — cut-outs sit on a clean studio backdrop */}
+                      <div className="relative aspect-[4/5] w-full overflow-hidden bg-gradient-to-b from-slate-200 to-slate-400">
+                        {c.photo_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={c.photo_url} alt="" className="absolute inset-0 size-full object-cover" />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center bg-muted">
+                            <UserRound className="size-16 text-muted-foreground" />
+                          </div>
+                        )}
+                        <AnimatePresence>
+                          {selected && (
+                            <motion.span
+                              initial={{ scale: 0, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              exit={{ scale: 0, opacity: 0 }}
+                              transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+                              className="absolute top-3 right-3 flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg"
+                            >
+                              <Check className="size-5" />
+                            </motion.span>
+                          )}
+                        </AnimatePresence>
+                      </div>
+
+                      {/* Details */}
+                      <div
+                        className="flex flex-1 flex-col gap-1.5 p-4"
+                        style={{ borderTop: `3px solid ${accent}` }}
+                      >
+                        <p className="text-base leading-tight font-bold sm:text-lg">{c.candidate_name}</p>
+                        <p className="flex items-center gap-1.5 text-sm font-medium" style={{ color: c.party_color }}>
+                          <span className="inline-block size-2 shrink-0 rounded-full" style={{ background: accent }} />
                           {c.party_list || 'Independent'}
                         </p>
-                        {c.motto && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground italic">“{c.motto}”</p>}
-                      </div>
-                      <AnimatePresence>
-                        {selected && (
-                          <motion.span
-                            initial={{ scale: 0, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0, opacity: 0 }}
-                            transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                            className="absolute top-3 right-3 flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground"
-                          >
-                            <Check className="size-4" />
-                          </motion.span>
+                        {(c.grade_level || c.section) && (
+                          <span className="inline-flex w-fit items-center rounded-full bg-muted/60 px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                            {[c.grade_level, c.section].filter(Boolean).join(' · ')}
+                          </span>
                         )}
-                      </AnimatePresence>
+                        {c.motto && (
+                          <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground italic">“{c.motto}”</p>
+                        )}
+                      </div>
                     </motion.button>
                   )
                 })}
