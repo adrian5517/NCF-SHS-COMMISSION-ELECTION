@@ -150,10 +150,9 @@ export default function CodesPage() {
     const rows: string[] = []
     for (const grade of Object.keys(byGrade).sort()) {
       rows.push(`<section style="page-break-before:auto;margin-bottom:1.5rem">`)
-      rows.push(`<h2 style="font-size:1.2rem;font-weight:700;margin:0 0 0.25rem">Grade ${grade}</h2>`)
       for (const section of Object.keys(byGrade[grade]).sort()) {
         const list = byGrade[grade][section].sort((a, b) => a.full_name.localeCompare(b.full_name))
-        rows.push(`<h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.25rem;color:#555">Section — ${section} <span style="font-weight:400;color:#999">(${list.length} students)</span></h3>`)
+        rows.push(`<h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.25rem;color:#555">Grade ${grade} — Section ${section} <span style="font-weight:400;color:#999">(${list.length} students)</span></h3>`)
         rows.push(`<table style="width:100%;border-collapse:collapse;font-size:0.8rem">`)
         rows.push(`<thead><tr style="border-bottom:2px solid #222;text-align:left">`)
         rows.push(`<th style="padding:4px 8px">#</th>`)
