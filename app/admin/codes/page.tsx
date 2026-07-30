@@ -136,6 +136,80 @@ export default function CodesPage() {
     return 'active'
   }
 
+  function printAllCodes() {
+    const byGrade: Record<string, Record<string, Student[]>> = {}
+    for (const s of students) {
+      if (s.status === 'voted') continue
+      const code = latestCode.get(s.id)
+      if (!code) continue
+      if (!byGrade[s.grade_level]) byGrade[s.grade_level] = {}
+      if (!byGrade[s.grade_level][s.section]) byGrade[s.grade_level][s.section] = []
+      byGrade[s.grade_level][s.section].push(s)
+    }
+
+    const rows: string[] = []
+    for (const grade of Object.keys(byGrade).sort()) {
+      rows.push(`<section style="page-break-before:auto;margin-bottom:1.5rem">`)
+      rows.push(`<h2 style="font-size:1.2rem;font-weight:700;margin:0 0 0.25rem">Grade ${grade}</h2>`)
+      for (const section of Object.keys(byGrade[grade]).sort()) {
+        const list = byGrade[grade][section].sort((a, b) => a.full_name.localeCompare(b.full_name))
+        rows.push(`<h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.25rem;color:#555">Section — ${section} <span style="font-weight:400;color:#999">(${list.length} students)</span></h3>`)
+        rows.push(`<table style="width:100%;border-collapse:collapse;font-size:0.8rem">`)
+        rows.push(`<thead><tr style="border-bottom:2px solid #222;text-align:left">`)
+        rows.push(`<th style="padding:4px 8px">#</th>`)
+        rows.push(`<th style="padding:4px 8px">Student</th>`)
+        rows.push(`<th style="padding:4px 8px">Student ID</th>`)
+        rows.push(`<th style="padding:4px 8px">Code</th>`)
+        rows.push(`</tr></thead><tbody>`)
+        list.forEach((s, i) => {
+          const code = latestCode.get(s.id)!
+          rows.push(`<tr style="border-bottom:1px solid #ddd">`)
+          rows.push(`<td style="padding:3px 8px;color:#888;width:2rem">${i + 1}</td>`)
+          rows.push(`<td style="padding:3px 8px">${s.full_name}</td>`)
+          rows.push(`<td style="padding:3px 8px;font-family:monospace;font-size:0.75rem">${s.lrn}</td>`)
+          rows.push(`<td style="padding:3px 8px;font-family:monospace;font-weight:700;letter-spacing:0.08em">${code.code}</td>`)
+          rows.push(`</tr>`)
+        })
+        rows.push(`</tbody></table>`)
+      }
+      rows.push(`</section>`)
+    }
+
+    const w = window.open('', '_blank')
+    if (!w) return
+    w.document.write(`<!DOCTYPE html>
+<html>
+<head><title>Voting Codes — ${election?.title ?? ''}</title>
+<style>
+  @page { margin: 1.5cm }
+  * { box-sizing:border-box; margin:0; padding:0 }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; color:#222; padding:0 }
+  header { display:flex; align-items:center; gap:12px; margin-bottom:1.5rem; padding-bottom:1rem; border-bottom:2px solid #222 }
+  header img { height:44px; width:44px; border-radius:50%; object-fit:contain }
+  header h1 { font-size:1.4rem }
+  header p { font-size:0.75rem; color:#777 }
+  @media print {
+    button { display:none }
+    section { page-break-inside:avoid }
+  }
+</style></head>
+<body>
+<header>
+  <img src="/ncf-shs.png" alt="" />
+  <div>
+    <h1>Voting Codes — ${election?.title ?? ''}</h1>
+    <p>Generated ${new Date().toLocaleString()} &middot; ${students.length} students</p>
+  </div>
+</header>
+${rows.join('\n')}
+<div style="margin-top:2rem;padding-top:0.75rem;border-top:1px solid #ccc;font-size:0.7rem;color:#999;text-align:center">
+  NCF SHS Commission on Elections &middot; Printed ${new Date().toLocaleString()}
+</div>
+<script>document.addEventListener('DOMContentLoaded',()=>{window.print()})<${''}/script>
+</body></html>`)
+    w.document.close()
+  }
+
   const filtered = students
     .filter(
       (s) =>
@@ -175,7 +249,10 @@ export default function CodesPage() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => window.print()}>
-            <Printer data-icon="inline-start" /> Print code list
+            <Printer data-icon="inline-start" /> Print table
+          </Button>
+          <Button variant="outline" onClick={printAllCodes}>
+            <Printer data-icon="inline-start" /> Print all codes
           </Button>
           <Button
             variant="destructive"
