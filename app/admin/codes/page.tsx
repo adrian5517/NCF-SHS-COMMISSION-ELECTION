@@ -149,7 +149,7 @@ export default function CodesPage() {
 
     const rows: string[] = []
     for (const grade of Object.keys(byGrade).sort()) {
-      rows.push(`<section style="page-break-before:auto;margin-bottom:0.75rem">`)
+      rows.push(`<section style="page-break-before:auto;margin-bottom:1.5rem">`)
       for (const section of Object.keys(byGrade[grade]).sort()) {
         const list = byGrade[grade][section].sort((a, b) => a.full_name.localeCompare(b.full_name))
         rows.push(`<h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.25rem;color:#555">Grade ${grade} — Section ${section} <span style="font-weight:400;color:#999">(${list.length} students)</span></h3>`)
@@ -180,10 +180,10 @@ export default function CodesPage() {
 <html>
 <head><title>Voting Codes — ${election?.title ?? ''}</title>
 <style>
-  @page { margin: 1cm 1.5cm }
+  @page { margin: 1.5cm }
   * { box-sizing:border-box; margin:0; padding:0 }
   body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; color:#222; padding:0 }
-  header { display:flex; align-items:center; gap:12px; margin-bottom:0.75rem; padding-bottom:0; border-bottom:none }
+  header { display:flex; align-items:center; gap:12px; margin-bottom:1.5rem; padding-bottom:1rem; border-bottom:2px solid #222 }
   header img { height:44px; width:44px; border-radius:50%; object-fit:contain }
   header h1 { font-size:1.4rem }
   header p { font-size:0.75rem; color:#777 }
@@ -201,7 +201,7 @@ export default function CodesPage() {
   </div>
 </header>
 ${rows.join('\n')}
-<div style="margin-top:1rem;padding-top:0.5rem;border-top:1px solid #ccc;font-size:0.65rem;color:#999;text-align:center">
+<div style="margin-top:2rem;padding-top:0.75rem;border-top:1px solid #ccc;font-size:0.7rem;color:#999;text-align:center">
   NCF SHS Commission on Elections &middot; Printed ${new Date().toLocaleString()}
 </div>
 <script>document.addEventListener('DOMContentLoaded',()=>{window.print()})<${''}/script>
