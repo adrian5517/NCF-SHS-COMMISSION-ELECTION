@@ -65,7 +65,7 @@ function ProjectorBoard({ electionId }: { electionId: string }) {
         </div>
         <div className="flex items-center justify-self-center gap-[clamp(0.75rem,1.5vw,1.75rem)]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/gradeschool-logo.png" alt="Naga College Foundation" className="h-[clamp(2.75rem,4.5vw,5.5rem)] w-auto object-contain" />
+          <img src="/ncf-shs.png" alt="Naga College Foundation" className="h-[clamp(2.75rem,4.5vw,5.5rem)] w-auto object-contain" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/dlssa-logo.png" alt="La Sallian Schools Supervision Services Association" className="h-[clamp(2.75rem,4.5vw,5.5rem)] w-auto object-contain" />
         </div>

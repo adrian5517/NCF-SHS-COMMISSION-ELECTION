@@ -27,31 +27,50 @@ export async function bulkGenerateCodes(params: {
   await requireRole('admin')
   const supabase = await createClient()
 
-  const { data: students, error } = await supabase
-    .from('students')
-    .select('id')
-    .eq('grade_level', params.gradeLevel)
-    .eq('section', params.section)
-    .eq('status', 'pending')
-  if (error) return { ok: false, error: error.message }
-  if (!students?.length) return { ok: false, error: 'No pending students in that section.' }
+  let baseQuery = supabase.from('students').select('id').eq('status', 'pending')
+  if (params.gradeLevel) baseQuery = baseQuery.eq('grade_level', params.gradeLevel)
+  if (params.section) baseQuery = baseQuery.eq('section', params.section)
 
-  const studentIds = students.map((s) => s.id)
-  let targetIds = studentIds
+  const allIds: string[] = []
+  const CHUNK = 1000
+  let from = 0
+  let hasMore = true
+  while (hasMore) {
+    const { data: chunk, error } = await baseQuery.range(from, from + CHUNK - 1)
+    if (error) return { ok: false, error: error.message }
+    if (!chunk?.length) { hasMore = false; break }
+    allIds.push(...chunk.map((s) => s.id))
+    if (chunk.length < CHUNK) hasMore = false
+    from += CHUNK
+  }
+  if (!allIds.length) return { ok: false, error: 'No pending students found.' }
+
+  let targetIds = allIds
   let skipped = 0
 
   if (!params.force) {
     // Don't touch students who already have a valid, unused code — protects
     // codes already printed/handed out when new students are added later.
-    const { data: activeCodes } = await supabase
-      .from('voting_codes')
-      .select('student_id')
-      .eq('election_id', params.electionId)
-      .eq('is_used', false)
-      .gt('expires_at', new Date().toISOString())
-      .in('student_id', studentIds)
-    const alreadyActive = new Set((activeCodes ?? []).map((c) => c.student_id))
-    targetIds = studentIds.filter((id) => !alreadyActive.has(id))
+    const idSet = new Set(allIds)
+    const activeCodes: string[] = []
+    let acFrom = 0
+    let acHasMore = true
+    while (acHasMore) {
+      const { data: chunk } = await supabase
+        .from('voting_codes')
+        .select('student_id')
+        .eq('election_id', params.electionId)
+        .eq('is_used', false)
+        .gt('expires_at', new Date().toISOString())
+        .order('student_id')
+        .range(acFrom, acFrom + CHUNK - 1)
+      if (!chunk?.length) { acHasMore = false; break }
+      for (const r of chunk) { if (idSet.has(r.student_id)) activeCodes.push(r.student_id) }
+      if (chunk.length < CHUNK) acHasMore = false
+      acFrom += CHUNK
+    }
+    const alreadyActive = new Set(activeCodes)
+    targetIds = allIds.filter((id) => !alreadyActive.has(id))
     skipped = alreadyActive.size
   }
 
@@ -59,7 +78,7 @@ export async function bulkGenerateCodes(params: {
     return { ok: true, data: { count: 0, skipped } }
   }
 
-  const expiresAt = new Date(Date.now() + params.minutes * 60_000).toISOString()
+  const expiresAt = params.minutes === -1 ? '9999-12-31T23:59:59Z' : new Date(Date.now() + params.minutes * 60_000).toISOString()
   const rows = targetIds.map((id) => ({
     student_id: id,
     election_id: params.electionId,
@@ -68,15 +87,22 @@ export async function bulkGenerateCodes(params: {
   }))
 
   // Clear out any stale (expired or, if forced, still-active) unused codes for these students first.
-  await supabase
-    .from('voting_codes')
-    .delete()
-    .eq('election_id', params.electionId)
-    .eq('is_used', false)
-    .in('student_id', targetIds)
+  const INSERT_CHUNK = 500
+  for (let i = 0; i < targetIds.length; i += INSERT_CHUNK) {
+    const chunk = targetIds.slice(i, i + INSERT_CHUNK)
+    await supabase
+      .from('voting_codes')
+      .delete()
+      .eq('election_id', params.electionId)
+      .eq('is_used', false)
+      .in('student_id', chunk)
+  }
 
-  const { error: insertError } = await supabase.from('voting_codes').insert(rows)
-  if (insertError) return { ok: false, error: insertError.message }
+  for (let i = 0; i < rows.length; i += INSERT_CHUNK) {
+    const chunk = rows.slice(i, i + INSERT_CHUNK)
+    const { error: insertError } = await supabase.from('voting_codes').insert(chunk)
+    if (insertError) return { ok: false, error: insertError.message }
+  }
 
   await logAudit('Bulk codes generated', {
     grade_level: params.gradeLevel,
@@ -110,7 +136,7 @@ export async function regenerateCode(params: {
     student_id: params.studentId,
     election_id: params.electionId,
     code,
-    expires_at: new Date(Date.now() + params.minutes * 60_000).toISOString(),
+    expires_at: params.minutes === -1 ? '9999-12-31T23:59:59Z' : new Date(Date.now() + params.minutes * 60_000).toISOString(),
   })
   if (error) return { ok: false, error: error.message }
 

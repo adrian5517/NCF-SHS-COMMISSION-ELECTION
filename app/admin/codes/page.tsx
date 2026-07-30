@@ -49,6 +49,8 @@ export default function CodesPage() {
   const [busy, setBusy] = useState(false)
   const [resetting, setResetting] = useState(false)
   const [message, setMessage] = useState('')
+  const [page, setPage] = useState(0)
+  const rowsPerPage = 50
 
   const load = useCallback(async () => {
     const supabase = createClient()
@@ -60,14 +62,45 @@ export default function CodesPage() {
       .limit(1)
     const active = (el?.[0] as Election) ?? null
     setElection(active)
-    const [{ data: st }, { data: vc }] = await Promise.all([
-      supabase.from('students').select('*').order('full_name'),
-      active
-        ? supabase.from('voting_codes').select('*').eq('election_id', active.id).order('created_at', { ascending: false })
-        : Promise.resolve({ data: [] }),
-    ])
-    setStudents((st as Student[]) ?? [])
-    setCodes((vc as VotingCode[]) ?? [])
+    if (active) {
+      const allCodes: VotingCode[] = []
+      const VC_CHUNK = 1000
+      let vcFrom = 0
+      let vcHasMore = true
+      while (vcHasMore) {
+        const { data: chunk } = await supabase
+          .from('voting_codes')
+          .select('*')
+          .eq('election_id', active.id)
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: true })
+          .range(vcFrom, vcFrom + VC_CHUNK - 1)
+        if (!chunk?.length) { vcHasMore = false; break }
+        allCodes.push(...(chunk as VotingCode[]))
+        if (chunk.length < VC_CHUNK) vcHasMore = false
+        vcFrom += VC_CHUNK
+      }
+      setCodes(allCodes)
+    }
+
+    // Fetch students in chunks to work around PostgREST's default row limit.
+    const allStudents: Student[] = []
+    const CHUNK = 1000
+    let from = 0
+    let hasMore = true
+    while (hasMore) {
+      const { data: chunk, error } = await supabase
+        .from('students')
+        .select('*')
+        .order('full_name')
+        .range(from, from + CHUNK - 1)
+      if (error) break
+      if (!chunk?.length) { hasMore = false; break }
+      allStudents.push(...(chunk as Student[]))
+      if (chunk.length < CHUNK) hasMore = false
+      from += CHUNK
+    }
+    setStudents(allStudents)
   }, [])
 
   useEffect(() => {
@@ -116,6 +149,10 @@ export default function CodesPage() {
       if (sortKey === 'newest') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       return a.full_name.localeCompare(b.full_name)
     })
+  const pageCount = Math.ceil(filtered.length / rowsPerPage)
+  const safePage = Math.min(page, Math.max(pageCount - 1, 0))
+  const paginated = filtered.slice(safePage * rowsPerPage, (safePage + 1) * rowsPerPage)
+  useEffect(() => { setPage(0) }, [grade, section, codeStatus, search, sortKey])
 
   if (election === null)
     return (
@@ -194,6 +231,7 @@ export default function CodesPage() {
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Code lifetime</label>
               <select className={field} value={minutes} onChange={(e) => setMinutes(Number(e.target.value))}>
                 {[
+                  { m: -1, label: 'Never (no expiry)' },
                   { m: 5, label: '5 minutes' },
                   { m: 10, label: '10 minutes' },
                   { m: 15, label: '15 minutes' },
@@ -210,7 +248,7 @@ export default function CodesPage() {
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-4">
             <Button
-              disabled={busy || !grade || !section}
+              disabled={busy}
               onClick={async () => {
                 setBusy(true)
                 const result = await bulkGenerateCodes({
@@ -221,9 +259,10 @@ export default function CodesPage() {
                   force: !skipActive,
                 })
                 setBusy(false)
+                const scope = grade && section ? `${grade} — ${section}` : grade || section || 'all pending students'
                 setMessage(
                   result.ok
-                    ? `Generated ${result.data?.count} code${result.data?.count === 1 ? '' : 's'} for ${grade} — ${section}${
+                    ? `Generated ${result.data?.count} code${result.data?.count === 1 ? '' : 's'} for ${scope}${
                         result.data && result.data.skipped > 0
                           ? ` (${result.data.skipped} already had an active code, skipped).`
                           : '.'
@@ -240,8 +279,8 @@ export default function CodesPage() {
               Skip students with an active code
             </label>
           </div>
-          {(!grade || !section) && (
-            <p className="mt-3 text-xs text-muted-foreground">Pick a grade level and section to bulk-generate codes.</p>
+          {!grade && !section && (
+            <p className="mt-3 text-xs text-muted-foreground">Leave both empty to generate codes for all pending students across all grades and sections.</p>
           )}
         </div>
 
@@ -313,7 +352,7 @@ export default function CodesPage() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((s) => {
+            {paginated.map((s) => {
               const code = latestCode.get(s.id)
               return (
                 <tr key={s.id} className="border-b border-border/50 last:border-0">
@@ -373,6 +412,27 @@ export default function CodesPage() {
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="no-print mt-4 flex items-center justify-between text-sm text-muted-foreground">
+        <p>
+          {filtered.length > 0
+            ? `${safePage * rowsPerPage + 1}–${Math.min((safePage + 1) * rowsPerPage, filtered.length)} of ${filtered.length}`
+            : '0 students'}
+        </p>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>
+            Previous
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={safePage >= pageCount - 1}
+            onClick={() => setPage(safePage + 1)}
+          >
+            Next
+          </Button>
+        </div>
       </div>
     </div>
   )

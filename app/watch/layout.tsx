@@ -12,11 +12,11 @@ export default async function WatchLayout({ children }: { children: React.ReactN
         <div className="flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/gradeschool-logo.png"
+            src="/ncf-shs.png"
             alt=""
             className="size-9 shrink-0 rounded-full bg-white object-contain p-0.5 ring-1 ring-border"
           />
-          <span className="font-display text-sm font-semibold">NCF-Gradeschool-Voting</span>
+          <span className="font-display text-sm font-semibold">NCF-SHS-COMMISSION-ON-ELECTIONS</span>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-chart-2/15 px-2.5 py-0.5 text-xs font-medium text-chart-2">
             <Eye className="size-3" /> Poll Watcher — read only
           </span>

@@ -1,5 +1,5 @@
 -- ============================================================
--- NCF-Gradeschool-Voting — "Yes Party" candidate slate
+-- NCF-SHS-COMMISSION-ON-ELECTIONS — "Yes Party" candidate slate
 -- Paste into the Supabase SQL Editor and run once, after
 -- seed-lead-party.sql (or any election with these positions
 -- already set up).

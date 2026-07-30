@@ -7,11 +7,11 @@ const body = Inter({ subsets: ['latin'], variable: '--font-body' })
 const display = Space_Grotesk({ subsets: ['latin'], variable: '--font-display' })
 
 export const metadata: Metadata = {
-  title: 'NCF-Gradeschool-Voting',
+  title: 'NCF-SHS-COMMISSION-ON-ELECTIONS',
   description: 'NCF Grade School Digital Election System — secure, live, kiosk-ready school voting.',
   icons: {
-    icon: '/gradeschool-logo.png',
-    apple: '/gradeschool-logo.png',
+    icon: '/ncf-shs.png',
+    apple: '/ncf-shs.png',
   },
 }
 

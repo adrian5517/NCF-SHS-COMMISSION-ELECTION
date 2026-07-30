@@ -1,5 +1,5 @@
 -- ============================================================
--- NCF-Gradeschool-Voting — sample/demo data
+-- NCF-SHS-COMMISSION-ON-ELECTIONS — sample/demo data
 -- Optional. Paste into the Supabase SQL Editor and run once, after
 -- schema.sql, to see the results pages populated with realistic
 -- content: an ongoing election, a full ballot, and cast votes.

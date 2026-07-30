@@ -99,11 +99,11 @@ export function AdminNav({
         <div className="flex items-center gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/gradeschool-logo.png"
+            src="/ncf-shs.png"
             alt=""
             className="size-9 shrink-0 rounded-full bg-white object-contain p-0.5 ring-1 ring-border"
           />
-          <span className="font-display text-sm leading-tight font-semibold">NCF-Gradeschool-Voting</span>
+          <span className="font-display text-sm leading-tight font-semibold">NCF-SHS-COMMISSION-ON-ELECTIONS</span>
         </div>
         <Button
           variant="ghost"
@@ -138,11 +138,11 @@ export function AdminNav({
         <div className="mb-8 flex items-center gap-2.5 px-2 pt-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/gradeschool-logo.png"
+            src="/ncf-shs.png"
             alt=""
             className="size-9 shrink-0 rounded-full bg-white object-contain p-0.5 ring-1 ring-border"
           />
-          <span className="font-display text-sm leading-tight font-semibold">NCF-Gradeschool-Voting</span>
+          <span className="font-display text-sm leading-tight font-semibold">NCF-SHS-COMMISSION-ON-ELECTIONS</span>
         </div>
         <NavLinks pathname={pathname} />
         <ProfileFooter fullName={fullName} logoutAction={logoutAction} />

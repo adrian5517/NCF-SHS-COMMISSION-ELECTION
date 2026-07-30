@@ -1,5 +1,5 @@
 -- ============================================================
--- NCF-Gradeschool-Voting — reset sample/mock data
+-- NCF-SHS-COMMISSION-ON-ELECTIONS — reset sample/mock data
 -- Run this in the Supabase SQL Editor when you're done testing
 -- and ready to start fresh with your real students and election.
 --

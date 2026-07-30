@@ -23,7 +23,13 @@ export default function LoginPage() {
         <Link href="/" className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" /> Back to home
         </Link>
-        <SchoolLogos className="mb-6" />
+        <div className="mb-6 flex items-center justify-center gap-3">
+          <SchoolLogos inline />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/ncf-shs.png" alt="NCF Senior High School" className="size-16 rounded-full object-contain drop-shadow-lg sm:size-20" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/ncf_ssc.png" alt="NCF Supreme Student Council" className="size-16 rounded-full object-contain drop-shadow-lg sm:size-20" />
+        </div>
         <div className="mb-8 flex items-center gap-3">
           <div className="flex size-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
             <ShieldCheck className="size-6" />

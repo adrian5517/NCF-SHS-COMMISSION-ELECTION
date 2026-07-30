@@ -1,5 +1,5 @@
 -- ============================================================
--- NCF-Gradeschool-Voting — START THE ELECTION FRESH
+-- NCF-SHS-COMMISSION-ON-ELECTIONS — START THE ELECTION FRESH
 -- Run this in the Supabase SQL Editor to zero out all voting
 -- activity right before the real election begins.
 --

@@ -1,5 +1,5 @@
 -- ============================================================
--- NCF-Gradeschool-Voting — Supabase schema
+-- NCF-SHS-COMMISSION-ON-ELECTIONS — Supabase schema
 -- Run this whole file in the Supabase SQL Editor (one shot).
 -- ============================================================
 
@@ -77,6 +77,7 @@ create table if not exists public.students (
   full_name text not null,
   grade_level text not null,
   section text not null,
+  strand text not null default '',
   status text not null default 'pending' check (status in ('pending', 'voted')),
   created_at timestamptz not null default now()
 );

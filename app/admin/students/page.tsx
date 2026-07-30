@@ -29,16 +29,29 @@ export default function StudentsPage() {
     setMessageIsError(!result.ok)
     setMessage(result.ok ? (successText ?? '') : result.error!)
   }
-  const [form, setForm] = useState<StudentRow>({ lrn: '', full_name: '', grade_level: '', section: '' })
+  const [form, setForm] = useState<StudentRow>({ lrn: '', full_name: '', grade_level: '', section: '', strand: '' })
 
   const load = useCallback(async () => {
-    const { data } = await createClient()
-      .from('students')
-      .select('*')
-      .order('grade_level')
-      .order('section')
-      .order('full_name')
-    setStudents((data as Student[]) ?? [])
+    const supabase = createClient()
+    const allStudents: Student[] = []
+    const CHUNK = 1000
+    let from = 0
+    let hasMore = true
+    while (hasMore) {
+      const { data: chunk, error } = await supabase
+        .from('students')
+        .select('*')
+        .order('grade_level')
+        .order('section')
+        .order('full_name')
+        .range(from, from + CHUNK - 1)
+      if (error) break
+      if (!chunk?.length) { hasMore = false; break }
+      allStudents.push(...(chunk as Student[]))
+      if (chunk.length < CHUNK) hasMore = false
+      from += CHUNK
+    }
+    setStudents(allStudents)
   }, [])
 
   useEffect(() => {
@@ -77,6 +90,8 @@ export default function StudentsPage() {
     student_id: 'lrn',
     studentid: 'lrn',
     id: 'lrn',
+    student_no: 'lrn',
+    studentno: 'lrn',
     full_name: 'full_name',
     fullname: 'full_name',
     name: 'full_name',
@@ -86,9 +101,10 @@ export default function StudentsPage() {
     grade: 'grade_level',
     year_level: 'grade_level',
     section: 'section',
+    strand: 'strand',
   }
   const normalizeHeader = (h: string) => {
-    const key = h.trim().toLowerCase().replace(/\s+/g, '_')
+    const key = h.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
     return headerAliases[key] ?? key
   }
 
@@ -116,7 +132,7 @@ export default function StudentsPage() {
       const normalized: Partial<StudentRow> = {}
       for (const [key, value] of Object.entries(row)) {
         const mapped = normalizeHeader(key)
-        if (mapped === 'lrn' || mapped === 'full_name' || mapped === 'grade_level' || mapped === 'section') {
+        if (mapped === 'lrn' || mapped === 'full_name' || mapped === 'grade_level' || mapped === 'section' || mapped === 'strand') {
           normalized[mapped] = String(value)
         }
       }
@@ -158,7 +174,7 @@ export default function StudentsPage() {
       </div>
 
       <p className="mt-2 text-xs text-muted-foreground">
-        Columns: Student ID, Name, Grade, Section (e.g. 12-01010). Accepts .csv, .xlsx, and .xls files.
+        Columns: Student No., Name, Grade, Section, Strand. Accepts .csv, .xlsx, and .xls files.
       </p>
       <AnimatePresence>
         {message && (
@@ -179,7 +195,7 @@ export default function StudentsPage() {
 
       {adding && (
         <form
-          className="glass mt-4 grid gap-3 rounded-2xl p-5 sm:grid-cols-5"
+          className="glass mt-4 grid gap-3 rounded-2xl p-5 sm:grid-cols-6"
           onSubmit={async (e) => {
             e.preventDefault()
             const result = await saveStudent(form)
@@ -191,10 +207,11 @@ export default function StudentsPage() {
             }
           }}
         >
-          <input required placeholder="Student ID (12-01010)" className={field} value={form.lrn} onChange={(e) => setForm({ ...form, lrn: e.target.value })} />
+          <input required placeholder="Student ID (26-0588)" className={field} value={form.lrn} onChange={(e) => setForm({ ...form, lrn: e.target.value })} />
           <input required placeholder="Full name" className={field} value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
           <input required placeholder="Grade level" className={field} value={form.grade_level} onChange={(e) => setForm({ ...form, grade_level: e.target.value })} />
           <input required placeholder="Section" className={field} value={form.section} onChange={(e) => setForm({ ...form, section: e.target.value })} />
+          <input placeholder="Strand" className={field} value={form.strand} onChange={(e) => setForm({ ...form, strand: e.target.value })} />
           <div className="flex gap-2">
             <Button type="submit">Save</Button>
             <Button type="button" variant="ghost" onClick={() => setAdding(false)}>
@@ -237,10 +254,11 @@ export default function StudentsPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border text-left text-xs text-muted-foreground uppercase">
-              <th className="px-4 py-3 font-medium">Student ID</th>
+              <th className="px-4 py-3 font-medium">Student No.</th>
               <th className="px-4 py-3 font-medium">Name</th>
               <th className="px-4 py-3 font-medium">Grade</th>
               <th className="px-4 py-3 font-medium">Section</th>
+              <th className="px-4 py-3 font-medium">Strand</th>
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3" />
             </tr>
@@ -252,6 +270,7 @@ export default function StudentsPage() {
                 <td className="px-4 py-2.5">{s.full_name}</td>
                 <td className="px-4 py-2.5">{s.grade_level}</td>
                 <td className="px-4 py-2.5">{s.section}</td>
+                <td className="px-4 py-2.5 text-xs text-muted-foreground">{s.strand || '—'}</td>
                 <td className="px-4 py-2.5">
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -280,7 +299,7 @@ export default function StudentsPage() {
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
                   No students found.
                 </td>
               </tr>

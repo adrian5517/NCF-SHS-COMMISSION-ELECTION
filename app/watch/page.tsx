@@ -60,8 +60,24 @@ function WatchDashboard({ electionId }: { electionId: string }) {
   }, [])
 
   const loadStudents = useCallback(async () => {
-    const { data } = await createClient().from('students').select('*').order('full_name')
-    setStudents((data as Student[]) ?? [])
+    const supabase = createClient()
+    const allStudents: Student[] = []
+    const CHUNK = 1000
+    let from = 0
+    let hasMore = true
+    while (hasMore) {
+      const { data: chunk, error } = await supabase
+        .from('students')
+        .select('*')
+        .order('full_name')
+        .range(from, from + CHUNK - 1)
+      if (error) break
+      if (!chunk?.length) { hasMore = false; break }
+      allStudents.push(...(chunk as Student[]))
+      if (chunk.length < CHUNK) hasMore = false
+      from += CHUNK
+    }
+    setStudents(allStudents)
   }, [])
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 -- ============================================================
--- NCF-Gradeschool-Voting — "Lead Party" candidate slate
+-- NCF-SHS-COMMISSION-ON-ELECTIONS — "Lead Party" candidate slate
 -- Paste into the Supabase SQL Editor and run once.
 --
 -- Adds these positions + candidates to your existing election

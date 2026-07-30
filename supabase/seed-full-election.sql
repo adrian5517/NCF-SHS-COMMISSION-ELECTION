@@ -1,5 +1,5 @@
 -- ============================================================
--- NCF-Gradeschool-Voting — full election seeder
+-- NCF-SHS-COMMISSION-ON-ELECTIONS — full election seeder
 -- Creates the election (if none exists) and adds BOTH parties'
 -- candidates to the SAME positions in one pass, so there's no
 -- chance of duplicate positions from running separate scripts.

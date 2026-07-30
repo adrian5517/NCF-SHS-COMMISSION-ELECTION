@@ -37,10 +37,19 @@ export async function staffLogin(_prev: ActionResult | null, formData: FormData)
   if (!email || !password) return { ok: false, error: 'Email and password are required.' }
 
   const supabase = await createClient()
-  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  const { error, data } = await supabase.auth.signInWithPassword({ email, password })
   if (error) return { ok: false, error: 'Invalid email or password.' }
 
-  const profile = await getProfile()
+  const userId = data.user?.id
+  if (!userId) return { ok: false, error: 'Could not retrieve user.' }
+
+  const { data: profile, error: profileErr } = await supabase
+    .rpc('get_profile_by_id', { p_user_id: userId })
+
+  if (profileErr) {
+    return { ok: false, error: `DB error: ${profileErr.message}` }
+  }
+
   if (!profile) {
     await supabase.auth.signOut()
     return { ok: false, error: 'No staff profile found for this account.' }

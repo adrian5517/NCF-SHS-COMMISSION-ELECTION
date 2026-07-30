@@ -1,5 +1,5 @@
 -- ============================================================
--- NCF-Gradeschool-Voting — create the election
+-- NCF-SHS-COMMISSION-ON-ELECTIONS — create the election
 -- Paste into the Supabase SQL Editor and run once, before
 -- seed-lead-party.sql / seed-yes-party.sql (or any other
 -- candidate seeder).

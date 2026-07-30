@@ -10,6 +10,7 @@ export interface StudentRow {
   full_name: string
   grade_level: string
   section: string
+  strand: string
 }
 
 export async function importStudents(rows: StudentRow[]): Promise<ActionResult<{ count: number }>> {
@@ -20,16 +21,23 @@ export async function importStudents(rows: StudentRow[]): Promise<ActionResult<{
       full_name: String(r.full_name ?? '').trim(),
       grade_level: String(r.grade_level ?? '').trim(),
       section: String(r.section ?? '').trim(),
+      strand: String(r.strand ?? '').trim(),
     }))
     .filter((r) => r.lrn && r.full_name && r.grade_level && r.section)
-  if (clean.length === 0) return { ok: false, error: 'No valid rows. Expected columns: lrn, full_name, grade_level, section.' }
+  if (clean.length === 0) return { ok: false, error: 'No valid rows. Expected columns: Student No., Name, Grade, Section.' }
 
   const supabase = await createClient()
-  const { error } = await supabase.from('students').upsert(clean, { onConflict: 'lrn', ignoreDuplicates: false })
-  if (error) return { ok: false, error: error.message }
-  await logAudit('Students imported', { count: clean.length })
+  const CHUNK = 500
+  let imported = 0
+  for (let i = 0; i < clean.length; i += CHUNK) {
+    const chunk = clean.slice(i, i + CHUNK)
+    const { error } = await supabase.from('students').upsert(chunk, { onConflict: 'lrn', ignoreDuplicates: false })
+    if (error) return { ok: false, error: error.message }
+    imported += chunk.length
+  }
+  await logAudit('Students imported', { count: imported })
   revalidatePath('/admin/students')
-  return { ok: true, data: { count: clean.length } }
+  return { ok: true, data: { count: imported } }
 }
 
 export async function saveStudent(form: StudentRow & { id?: string }): Promise<ActionResult> {

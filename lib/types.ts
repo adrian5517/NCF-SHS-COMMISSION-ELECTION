@@ -46,6 +46,7 @@ export interface Student {
   full_name: string
   grade_level: string
   section: string
+  strand: string
   status: 'pending' | 'voted'
   created_at: string
 }

@@ -1,4 +1,4 @@
-# NCF-Gradeschool-Voting
+# NCF-SHS-COMMISSION-ON-ELECTIONS
 
 Futuristic grade-school digital election system for a computer-lab setup.
 Next.js (App Router + Server Actions) · Supabase (Postgres, Auth, Storage, Realtime) · Tailwind CSS v4 · Recharts.
