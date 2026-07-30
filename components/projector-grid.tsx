@@ -18,18 +18,12 @@ export function ProjectorGrid({ stats }: { stats: LiveStats }) {
   }
 
   const positions = stats.results
-  const cols = Math.max(1, Math.ceil(Math.sqrt(positions.length * 1.4)))
 
   return (
-    <div
-      className="grid h-full gap-3"
-      style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridAutoRows: 'minmax(0, 1fr)' }}
-    >
+    <div className="grid h-full gap-2 sm:gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gridAutoRows: 'minmax(0, 1fr)' }}>
       {positions.map((pos) => {
         const totalVotes = pos.candidates.reduce((sum, c) => sum + c.votes, 0)
         const topVotes = pos.candidates[0]?.votes ?? 0
-        const count = pos.candidates.length || 1
-        const candCols = Math.min(count, Math.ceil(Math.sqrt(count * 1.3)))
 
         return (
           <section key={pos.position_id} className="glass flex min-h-0 flex-col overflow-hidden rounded-2xl p-3">
@@ -44,7 +38,7 @@ export function ProjectorGrid({ stats }: { stats: LiveStats }) {
 
             <div
               className="mt-2 grid min-h-0 flex-1 gap-2"
-              style={{ gridTemplateColumns: `repeat(${candCols}, minmax(0, 1fr))`, gridAutoRows: 'minmax(0, 1fr)' }}
+              style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gridAutoRows: 'minmax(0, 1fr)' }}
             >
               {pos.candidates.map((c, i) => {
                 const share = totalVotes ? Math.round((c.votes / totalVotes) * 100) : 0
