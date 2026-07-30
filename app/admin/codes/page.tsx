@@ -159,6 +159,7 @@ export default function CodesPage() {
         rows.push(`<th style="padding:4px 8px">Student</th>`)
         rows.push(`<th style="padding:4px 8px">Student ID</th>`)
         rows.push(`<th style="padding:4px 8px">Code</th>`)
+        rows.push(`<th style="padding:4px 8px">Status</th>`)
         rows.push(`</tr></thead><tbody>`)
         list.forEach((s, i) => {
           const code = latestCode.get(s.id)!
@@ -167,6 +168,7 @@ export default function CodesPage() {
           rows.push(`<td style="padding:3px 8px">${s.full_name}</td>`)
           rows.push(`<td style="padding:3px 8px;font-family:monospace;font-size:0.75rem">${s.lrn}</td>`)
           rows.push(`<td style="padding:3px 8px;font-family:monospace;font-weight:700;letter-spacing:0.08em">${code.code}</td>`)
+          rows.push(`<td style="padding:3px 8px;font-size:0.7rem;color:${s.status === 'voted' ? '#16a34a' : '#888'}">${s.status === 'voted' ? 'VOTED' : 'pending'}</td>`)
           rows.push(`</tr>`)
         })
         rows.push(`</tbody></table>`)
