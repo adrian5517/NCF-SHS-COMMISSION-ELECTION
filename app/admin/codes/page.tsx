@@ -248,9 +248,6 @@ ${rows.join('\n')}
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => window.print()}>
-            <Printer data-icon="inline-start" /> Print table
-          </Button>
           <Button variant="outline" onClick={printAllCodes}>
             <Printer data-icon="inline-start" /> Print all codes
           </Button>
