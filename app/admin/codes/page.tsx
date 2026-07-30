@@ -140,6 +140,8 @@ export default function CodesPage() {
     const byGrade: Record<string, Record<string, Student[]>> = {}
     for (const s of students) {
       if (s.status === 'voted') continue
+      if (grade && s.grade_level !== grade) continue
+      if (section && s.section !== section) continue
       const code = latestCode.get(s.id)
       if (!code) continue
       if (!byGrade[s.grade_level]) byGrade[s.grade_level] = {}
@@ -199,7 +201,7 @@ export default function CodesPage() {
   <img src="/ncf-shs.png" alt="" />
   <div>
     <h1>Voting Codes — ${election?.title ?? ''}</h1>
-    <p>Generated ${new Date().toLocaleString()} &middot; ${students.length} students</p>
+    <p>Generated ${new Date().toLocaleString()} &middot; ${Object.values(byGrade).reduce((s, sections) => s + Object.values(sections).reduce((a, l) => a + l.length, 0), 0)} students${grade ? ` &middot; Grade ${grade}` : ''}${section ? ` &middot; ${section}` : ''}</p>
   </div>
 </header>
 ${rows.join('\n')}
