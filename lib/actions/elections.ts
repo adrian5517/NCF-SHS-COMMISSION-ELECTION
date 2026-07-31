@@ -76,6 +76,7 @@ export async function savePosition(form: {
   position_name: string
   max_votes: number
   rank_order: number
+  eligible_grade_levels: string[]
 }): Promise<ActionResult> {
   await requireRole('admin')
   const supabase = await createClient()

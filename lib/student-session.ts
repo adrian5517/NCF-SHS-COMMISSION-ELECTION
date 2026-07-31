@@ -7,6 +7,7 @@ const MAX_AGE_SECONDS = 15 * 60 // a ballot session lives 15 minutes max
 export interface StudentSession {
   studentId: string
   studentName: string
+  gradeLevel: string
   codeId: string
   electionId: string
 }
@@ -43,6 +44,7 @@ export async function getStudentSession(): Promise<StudentSession | null> {
     return {
       studentId: payload.studentId as string,
       studentName: payload.studentName as string,
+      gradeLevel: payload.gradeLevel as string,
       codeId: payload.codeId as string,
       electionId: payload.electionId as string,
     }

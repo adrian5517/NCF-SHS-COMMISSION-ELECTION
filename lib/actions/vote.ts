@@ -72,6 +72,7 @@ export async function studentLogin(_prev: ActionResult | null, formData: FormDat
   await createStudentSession({
     studentId: data.student_id,
     studentName: data.student_name,
+    gradeLevel: data.grade_level,
     codeId: data.code_id,
     electionId: data.election_id,
   })
@@ -82,7 +83,10 @@ export async function getBallotForSession(): Promise<{ ballot: Ballot; studentNa
   const session = await getStudentSession()
   if (!session) return null
   const supabase = await createClient()
-  const { data, error } = await supabase.rpc('get_ballot', { p_election_id: session.electionId })
+  const { data, error } = await supabase.rpc('get_ballot', {
+    p_election_id: session.electionId,
+    p_grade_level: session.gradeLevel,
+  })
   if (error || !data?.election) return null
   return { ballot: data as Ballot, studentName: session.studentName }
 }
@@ -106,6 +110,7 @@ export async function submitBallot(selections: Record<string, string[]>): Promis
     p_code_id: session.codeId,
     p_student_id: session.studentId,
     p_selections: selections,
+    p_grade_level: session.gradeLevel,
   })
   if (error) return { ok: false, error: 'Connection problem — your vote was NOT lost. Tap "Submit" to retry.' }
   if (!data?.ok) return { ok: false, error: data?.error ?? 'Submission failed.' }

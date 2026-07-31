@@ -51,7 +51,8 @@ create table if not exists public.positions (
   election_id uuid not null references public.elections (id) on delete cascade,
   position_name text not null,
   max_votes int not null default 1 check (max_votes >= 1),
-  rank_order int not null default 0
+  rank_order int not null default 0,
+  eligible_grade_levels text[] not null default '{}'
 );
 create index if not exists positions_election_idx on public.positions (election_id, rank_order);
 
@@ -181,6 +182,7 @@ begin
     'ok', true,
     'student_id', v_student.id,
     'student_name', v_student.full_name,
+    'grade_level', v_student.grade_level,
     'code_id', v_code.id,
     'election_id', v_election.id
   );
@@ -189,7 +191,7 @@ end $$;
 -- ============================================================
 -- RPC: fetch the ballot (positions + candidates) for the kiosk.
 -- ============================================================
-create or replace function public.get_ballot(p_election_id uuid)
+create or replace function public.get_ballot(p_election_id uuid, p_grade_level text default null)
 returns jsonb language sql stable security definer set search_path = public as $$
   select jsonb_build_object(
     'election', (select jsonb_build_object('id', e.id, 'title', e.title, 'logo_url', e.logo_url)
@@ -197,6 +199,7 @@ returns jsonb language sql stable security definer set search_path = public as $
     'positions', coalesce((
       select jsonb_agg(jsonb_build_object(
         'id', p.id, 'position_name', p.position_name, 'max_votes', p.max_votes,
+        'eligible_grade_levels', p.eligible_grade_levels,
         'candidates', coalesce((
           select jsonb_agg(jsonb_build_object(
             'id', c.id, 'candidate_name', c.candidate_name, 'grade_level', c.grade_level,
@@ -205,7 +208,9 @@ returns jsonb language sql stable security definer set search_path = public as $
           ) order by c.display_order, c.candidate_name)
           from public.candidates c where c.position_id = p.id), '[]'::jsonb)
       ) order by p.rank_order)
-      from public.positions p where p.election_id = p_election_id), '[]'::jsonb)
+      from public.positions p
+      where p.election_id = p_election_id
+        and (p.eligible_grade_levels = '{}' or p_grade_level is null or p_grade_level = any(p.eligible_grade_levels))), '[]'::jsonb)
   );
 $$;
 
@@ -218,7 +223,8 @@ $$;
 create or replace function public.submit_ballot(
   p_code_id uuid,
   p_student_id uuid,
-  p_selections jsonb
+  p_selections jsonb,
+  p_grade_level text default null
 ) returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   v_code public.voting_codes;
@@ -246,16 +252,22 @@ begin
     return jsonb_build_object('ok', false, 'error', 'The election is not open right now.');
   end if;
 
-  -- Every key in the payload must be a real position in this election.
+  -- Every key in the payload must be a real position in this election
+  -- AND one the student's grade level is allowed to vote in.
   for v_pos_id in select jsonb_object_keys(p_selections) loop
-    if not exists (select 1 from public.positions where id = v_pos_id::uuid and election_id = v_election.id) then
+    if not exists (select 1 from public.positions
+                   where id = v_pos_id::uuid and election_id = v_election.id
+                     and (eligible_grade_levels = '{}'
+                          or p_grade_level is null
+                          or p_grade_level = any(eligible_grade_levels))) then
       return jsonb_build_object('ok', false, 'error', 'Ballot mismatch. Please try again.');
     end if;
   end loop;
 
-  -- Walk every position on the ballot: insert votes for chosen candidates,
-  -- or record an anonymous abstention when the student picked no one.
-  for v_position in select * from public.positions where election_id = v_election.id loop
+  -- Walk every position the student is eligible for: insert votes for chosen
+  -- candidates, or record an anonymous abstention when they picked no one.
+  for v_position in select * from public.positions where election_id = v_election.id
+    and (eligible_grade_levels = '{}' or p_grade_level is null or p_grade_level = any(eligible_grade_levels)) loop
     v_selection := coalesce(p_selections->v_position.id::text, '[]'::jsonb);
 
     select count(*) into v_count from jsonb_array_elements_text(v_selection);
@@ -421,11 +433,11 @@ end $$;
 
 -- Lock down RPC execution.
 revoke all on function public.validate_voting_code(text, text) from public;
-revoke all on function public.get_ballot(uuid) from public;
-revoke all on function public.submit_ballot(uuid, uuid, jsonb) from public;
+revoke all on function public.get_ballot(uuid, text) from public;
+revoke all on function public.submit_ballot(uuid, uuid, jsonb, text) from public;
 grant execute on function public.validate_voting_code(text, text) to anon, authenticated;
-grant execute on function public.get_ballot(uuid) to anon, authenticated;
-grant execute on function public.submit_ballot(uuid, uuid, jsonb) to anon, authenticated;
+grant execute on function public.get_ballot(uuid, text) to anon, authenticated;
+grant execute on function public.submit_ballot(uuid, uuid, jsonb, text) to anon, authenticated;
 revoke all on function public.get_active_election() from public;
 revoke all on function public.get_live_stats(uuid) from public;
 grant execute on function public.get_active_election() to anon, authenticated;

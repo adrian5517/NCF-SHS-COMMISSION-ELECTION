@@ -25,6 +25,7 @@ export interface Position {
   position_name: string
   max_votes: number
   rank_order: number
+  eligible_grade_levels: string[]
 }
 
 export interface Candidate {
@@ -73,6 +74,7 @@ export interface BallotPosition {
   id: string
   position_name: string
   max_votes: number
+  eligible_grade_levels: string[]
   candidates: BallotCandidate[]
 }
 

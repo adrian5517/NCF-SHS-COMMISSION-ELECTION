@@ -27,7 +27,7 @@ export default function CandidatesPage() {
   const [electionId, setElectionId] = useState('')
   const [positions, setPositions] = useState<Position[]>([])
   const [candidates, setCandidates] = useState<Candidate[]>([])
-  const [posForm, setPosForm] = useState<{ id?: string; position_name: string; max_votes: number; rank_order: number } | null>(null)
+  const [posForm, setPosForm] = useState<{ id?: string; position_name: string; max_votes: number; rank_order: number; eligible_grade_levels: string[] } | null>(null)
   const [candForm, setCandForm] = useState<(typeof emptyCandidate & { id?: string; position_id: string }) | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -94,7 +94,7 @@ export default function CandidatesPage() {
         <div className="mt-6 space-y-6">
           <Button
             variant="outline"
-            onClick={() => setPosForm({ position_name: '', max_votes: 1, rank_order: positions.length + 1 })}
+            onClick={() => setPosForm({ position_name: '', max_votes: 1, rank_order: positions.length + 1, eligible_grade_levels: [] })}
           >
             <Plus data-icon="inline-start" /> Add position
           </Button>
@@ -138,6 +138,47 @@ export default function CandidatesPage() {
                   onChange={(e) => setPosForm({ ...posForm, rank_order: Number(e.target.value) })}
                 />
               </div>
+              <div className="sm:col-span-4">
+                <label className="mb-1.5 block text-sm font-medium">Who can vote in this position?</label>
+                <div className="flex flex-wrap gap-2">
+                  <label
+                    className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors ${
+                      posForm.eligible_grade_levels.length === 0 ? 'border-ring bg-primary/10 font-medium' : 'border-border bg-background/40'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={posForm.eligible_grade_levels.length === 0}
+                      onChange={() => setPosForm({ ...posForm, eligible_grade_levels: [] })}
+                      className="size-4"
+                    />
+                    All grade levels
+                  </label>
+                  {['Grade 11', 'Grade 12'].map((g) => (
+                    <label
+                      key={g}
+                      className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors ${
+                        posForm.eligible_grade_levels.includes(g) ? 'border-ring bg-primary/10 font-medium' : 'border-border bg-background/40'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={posForm.eligible_grade_levels.includes(g)}
+                        onChange={() =>
+                          setPosForm({
+                            ...posForm,
+                            eligible_grade_levels: posForm.eligible_grade_levels.includes(g)
+                              ? posForm.eligible_grade_levels.filter((x) => x !== g)
+                              : [...posForm.eligible_grade_levels, g],
+                          })
+                        }
+                        className="size-4"
+                      />
+                      {g}
+                    </label>
+                  ))}
+                </div>
+              </div>
               <div className="flex gap-2 sm:col-span-4">
                 <Button type="submit" disabled={busy}>
                   Save position
@@ -157,7 +198,10 @@ export default function CandidatesPage() {
                   <div>
                     <h2 className="text-lg font-semibold">{pos.position_name}</h2>
                     <p className="text-xs text-muted-foreground">
-                      Vote for {pos.max_votes} · ballot order {pos.rank_order}
+                      Vote for {pos.max_votes} · ballot order {pos.rank_order} ·{' '}
+                      {(pos.eligible_grade_levels ?? []).length === 0
+                        ? 'open to all grades'
+                        : `voters: ${(pos.eligible_grade_levels ?? []).join(', ')}`}
                     </p>
                   </div>
                   <div className="flex gap-1.5">
@@ -172,7 +216,13 @@ export default function CandidatesPage() {
                       size="sm"
                       variant="ghost"
                       onClick={() =>
-                        setPosForm({ id: pos.id, position_name: pos.position_name, max_votes: pos.max_votes, rank_order: pos.rank_order })
+                        setPosForm({
+                          id: pos.id,
+                          position_name: pos.position_name,
+                          max_votes: pos.max_votes,
+                          rank_order: pos.rank_order,
+                          eligible_grade_levels: pos.eligible_grade_levels ?? [],
+                        })
                       }
                     >
                       <Pencil data-icon="inline-start" /> Edit
@@ -307,12 +357,17 @@ export default function CandidatesPage() {
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">Grade level</label>
-                <input
+                <select
                   className={field}
-                  placeholder="Grade 6"
                   value={candForm.grade_level}
                   onChange={(e) => setCandForm({ ...candForm, grade_level: e.target.value })}
-                />
+                >
+                  <option value="" disabled>
+                    Select grade level
+                  </option>
+                  <option value="Grade 11">Grade 11</option>
+                  <option value="Grade 12">Grade 12</option>
+                </select>
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">Section</label>
