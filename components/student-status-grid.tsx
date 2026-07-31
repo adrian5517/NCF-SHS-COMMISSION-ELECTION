@@ -7,7 +7,7 @@ import type { Student } from '@/lib/types'
 const field =
   'rounded-xl border border-input bg-background/60 px-3 py-2.5 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/40'
 
-// Deterministic green/gold gradient per student so avatars stay stable across reloads.
+  // Deterministic red/peach gradient per student so avatars stay stable across reloads.
 const GRADIENTS = [
   'from-chart-1 to-chart-3',
   'from-chart-2 to-chart-4',
