@@ -451,7 +451,15 @@ export function BallotWizard({ ballot, studentName }: { ballot: Ballot; studentN
                 </p>
               )}
               <div className="mt-6 flex flex-col gap-2.5">
-                <Button size="lg" className="h-12 text-base" onClick={submit} disabled={submitting}>
+                <Button
+                  size="lg"
+                  className="h-12 text-base"
+                  onClickCapture={() => {
+                    if (!submitting && !done) setSubmitting(true)
+                  }}
+                  onClick={submit}
+                  disabled={submitting}
+                >
                   {submitting ? 'Submitting…' : error ? 'Retry submit' : 'Yes, submit my vote'}
                 </Button>
                 <Button variant="ghost" size="lg" className="h-12 text-base" onClick={() => setConfirming(false)} disabled={submitting}>

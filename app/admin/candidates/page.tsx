@@ -72,6 +72,11 @@ export default function CandidatesPage() {
     return true
   }
 
+  function setEligibleGrades(eligible_grade_levels: string[]) {
+    if (!posForm) return
+    setPosForm({ ...posForm, eligible_grade_levels })
+  }
+
   return (
     <div className="mx-auto max-w-5xl">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -141,6 +146,32 @@ export default function CandidatesPage() {
               <div className="sm:col-span-4">
                 <label className="mb-1.5 block text-sm font-medium">Who can vote in this position?</label>
                 <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant={posForm.eligible_grade_levels.length === 0 ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setEligibleGrades([])}
+                  >
+                    All grades
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={posForm.eligible_grade_levels.length === 1 && posForm.eligible_grade_levels[0] === 'Grade 11' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setEligibleGrades(['Grade 11'])}
+                  >
+                    Grade 11 only
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={posForm.eligible_grade_levels.length === 1 && posForm.eligible_grade_levels[0] === 'Grade 12' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setEligibleGrades(['Grade 12'])}
+                  >
+                    Grade 12 only
+                  </Button>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
                   <label
                     className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors ${
                       posForm.eligible_grade_levels.length === 0 ? 'border-ring bg-primary/10 font-medium' : 'border-border bg-background/40'
@@ -149,7 +180,7 @@ export default function CandidatesPage() {
                     <input
                       type="checkbox"
                       checked={posForm.eligible_grade_levels.length === 0}
-                      onChange={() => setPosForm({ ...posForm, eligible_grade_levels: [] })}
+                      onChange={() => setEligibleGrades([])}
                       className="size-4"
                     />
                     All grade levels
@@ -362,9 +393,7 @@ export default function CandidatesPage() {
                   value={candForm.grade_level}
                   onChange={(e) => setCandForm({ ...candForm, grade_level: e.target.value })}
                 >
-                  <option value="" disabled>
-                    Select grade level
-                  </option>
+                  <option value="">No grade level</option>
                   <option value="Grade 11">Grade 11</option>
                   <option value="Grade 12">Grade 12</option>
                 </select>

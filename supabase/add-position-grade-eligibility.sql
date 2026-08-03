@@ -6,6 +6,39 @@
 alter table public.positions
   add column if not exists eligible_grade_levels text[] not null default '{}';
 
+-- Persisted tallies mirror raw votes/abstentions so live results can read
+-- counts directly while submit_ballot updates them in the same transaction.
+create table if not exists public.vote_tallies (
+  election_id uuid not null references public.elections (id) on delete cascade,
+  position_id uuid not null references public.positions (id) on delete cascade,
+  candidate_id uuid not null references public.candidates (id) on delete cascade,
+  votes bigint not null default 0,
+  primary key (election_id, candidate_id)
+);
+create index if not exists vote_tallies_position_idx on public.vote_tallies (election_id, position_id);
+
+insert into public.vote_tallies (election_id, position_id, candidate_id, votes)
+select election_id, position_id, candidate_id, count(*)
+from public.votes
+group by election_id, position_id, candidate_id
+on conflict (election_id, candidate_id)
+do update set votes = excluded.votes;
+
+create table if not exists public.abstention_tallies (
+  election_id uuid not null references public.elections (id) on delete cascade,
+  position_id uuid not null references public.positions (id) on delete cascade,
+  abstentions bigint not null default 0,
+  primary key (election_id, position_id)
+);
+create index if not exists abstention_tallies_position_idx on public.abstention_tallies (election_id, position_id);
+
+insert into public.abstention_tallies (election_id, position_id, abstentions)
+select election_id, position_id, count(*)
+from public.abstentions
+group by election_id, position_id
+on conflict (election_id, position_id)
+do update set abstentions = excluded.abstentions;
+
 -- validate_voting_code: also return the student's grade level so the kiosk
 -- session can pass it back to get_ballot / submit_ballot.
 create or replace function public.validate_voting_code(p_lrn text, p_code text)
@@ -138,6 +171,10 @@ begin
 
     if v_count = 0 then
       insert into public.abstentions (election_id, position_id) values (v_election.id, v_position.id);
+      insert into public.abstention_tallies (election_id, position_id, abstentions)
+      values (v_election.id, v_position.id, 1)
+      on conflict (election_id, position_id)
+      do update set abstentions = public.abstention_tallies.abstentions + 1;
     else
       for v_cand_id in select jsonb_array_elements_text(v_selection) loop
         if not exists (select 1 from public.candidates
@@ -146,6 +183,10 @@ begin
         end if;
         insert into public.votes (election_id, position_id, candidate_id)
         values (v_election.id, v_position.id, v_cand_id::uuid);
+        insert into public.vote_tallies (election_id, position_id, candidate_id, votes)
+        values (v_election.id, v_position.id, v_cand_id::uuid, 1)
+        on conflict (election_id, candidate_id)
+        do update set votes = public.vote_tallies.votes + 1;
       end loop;
     end if;
   end loop;

@@ -16,17 +16,17 @@ begin
   if v_election.hide_live_results and v_election.status not in ('closed', 'archived') then
     v_results := null;
   else
+    -- Persisted tallies are maintained inside submit_ballot, so we can read
+    -- the current counts directly without rescanning votes or abstentions.
     with vote_counts as (
-      select candidate_id, count(*) as votes
-      from public.votes
+      select candidate_id, votes
+      from public.vote_tallies
       where election_id = p_election_id
-      group by candidate_id
     ),
     abstain_counts as (
-      select position_id, count(*) as abstained
-      from public.abstentions
+      select position_id, abstentions as abstained
+      from public.abstention_tallies
       where election_id = p_election_id
-      group by position_id
     )
     select jsonb_agg(pos order by pos->'rank_order') into v_results
     from (

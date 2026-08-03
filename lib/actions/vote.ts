@@ -109,64 +109,77 @@ function studentSubmitLimited(studentId: string): boolean {
 }
 
 export async function studentLogin(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
-  const lrn = String(formData.get('lrn') ?? '').trim()
-  const code = String(formData.get('code') ?? '').trim()
-  if (!lrn || !code) return { ok: false, error: 'Please enter your Student ID and voting code.' }
+  try {
+    const lrn = String(formData.get('lrn') ?? '').trim()
+    const code = String(formData.get('code') ?? '').trim()
+    if (!lrn || !code) return { ok: false, error: 'Please enter your Student ID and voting code.' }
 
-  const ip = (await headers()).get('x-forwarded-for')?.split(',')[0] ?? 'local'
-  if (loginLimited(`${ip}:${lrn}`)) {
-    return { ok: false, error: 'Too many attempts. Please wait a minute and try again.' }
+    const ip = (await headers()).get('x-forwarded-for')?.split(',')[0] ?? 'local'
+    if (loginLimited(`${ip}:${lrn}`)) {
+      return { ok: false, error: 'Too many attempts. Please wait a minute and try again.' }
+    }
+
+    const supabase = await createClient()
+    const { data, error } = await supabase.rpc('validate_voting_code', { p_lrn: lrn, p_code: code })
+    if (error) return { ok: false, error: 'Connection problem. Please try again.' }
+    if (!data?.ok) return { ok: false, error: data?.error ?? 'Invalid credentials.' }
+
+    await createStudentSession({
+      studentId: data.student_id,
+      studentName: data.student_name,
+      gradeLevel: data.grade_level,
+      codeId: data.code_id,
+      electionId: data.election_id,
+    })
+    redirect('/ballot')
+  } catch {
+    return { ok: false, error: 'Unexpected login error. Please try again.' }
   }
-
-  const supabase = await createClient()
-  const { data, error } = await supabase.rpc('validate_voting_code', { p_lrn: lrn, p_code: code })
-  if (error) return { ok: false, error: 'Connection problem. Please try again.' }
-  if (!data?.ok) return { ok: false, error: data?.error ?? 'Invalid credentials.' }
-
-  await createStudentSession({
-    studentId: data.student_id,
-    studentName: data.student_name,
-    gradeLevel: data.grade_level,
-    codeId: data.code_id,
-    electionId: data.election_id,
-  })
-  redirect('/ballot')
 }
 
 export async function getBallotForSession(): Promise<{ ballot: Ballot; studentName: string } | null> {
-  const session = await getStudentSession()
-  if (!session) return null
-  const supabase = await createClient()
-  const { data, error } = await supabase.rpc('get_ballot', {
-    p_election_id: session.electionId,
-    p_grade_level: session.gradeLevel,
-  })
-  if (error || !data?.election) return null
-  return { ballot: data as Ballot, studentName: session.studentName }
+  try {
+    const session = await getStudentSession()
+    if (!session) return null
+    const supabase = await createClient()
+    const { data, error } = await supabase.rpc('get_ballot', {
+      p_election_id: session.electionId,
+      p_grade_level: session.gradeLevel,
+    })
+    if (error || !data?.election) return null
+    const ballot = data as Ballot
+    const visiblePositions = ballot.positions.filter((position) => {
+      const allowedGrades = position.eligible_grade_levels ?? []
+      return allowedGrades.length === 0 || !session.gradeLevel || allowedGrades.includes(session.gradeLevel)
+    })
+    return { ballot: { ...ballot, positions: visiblePositions }, studentName: session.studentName }
+  } catch {
+    return null
+  }
 }
 
 export async function submitBallot(selections: Record<string, string[]>): Promise<ActionResult> {
-  const session = await getStudentSession()
-  if (!session) return { ok: false, error: 'Your session expired. Please log in again.' }
-
-  const dedupeKey = `${session.electionId}:${session.studentId}:${session.codeId}`
-  const now = Date.now()
-  pruneRecentlySubmitted(now)
-  const recentUntil = recentlySubmitted.get(dedupeKey)
-  if (recentUntil && recentUntil > now) {
-    noteSubmitMetric('preventedRecent')
-    return { ok: true }
-  }
-  if (recentUntil && recentUntil <= now) {
-    recentlySubmitted.delete(dedupeKey)
-  }
-  if (submitInFlight.has(dedupeKey)) {
-    noteSubmitMetric('preventedInFlight')
-    return { ok: false, error: 'Your ballot is already being submitted. Please wait.' }
-  }
-  submitInFlight.add(dedupeKey)
-
+  let dedupeKey: string | null = null
   try {
+    const session = await getStudentSession()
+    if (!session) return { ok: false, error: 'Your session expired. Please log in again.' }
+
+    dedupeKey = `${session.electionId}:${session.studentId}:${session.codeId}`
+    const now = Date.now()
+    pruneRecentlySubmitted(now)
+    const recentUntil = recentlySubmitted.get(dedupeKey)
+    if (recentUntil && recentUntil > now) {
+      noteSubmitMetric('preventedRecent')
+      return { ok: true }
+    }
+    if (recentUntil && recentUntil <= now) {
+      recentlySubmitted.delete(dedupeKey)
+    }
+    if (submitInFlight.has(dedupeKey)) {
+      noteSubmitMetric('preventedInFlight')
+      return { ok: false, error: 'Your ballot is already being submitted. Please wait.' }
+    }
+    submitInFlight.add(dedupeKey)
 
     // Per-student retry guard
     if (studentSubmitLimited(session.studentId)) {
@@ -201,7 +214,9 @@ export async function submitBallot(selections: Record<string, string[]>): Promis
     await clearStudentSession()
     return { ok: true }
   } finally {
-    submitInFlight.delete(dedupeKey)
+    if (dedupeKey) {
+      submitInFlight.delete(dedupeKey)
+    }
   }
 }
 

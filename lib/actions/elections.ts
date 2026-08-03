@@ -10,6 +10,16 @@ function fail(error: unknown, fallback: string): ActionResult {
   return { ok: false, error: message }
 }
 
+function normalizeEligibleGradeLevels(values: string[]) {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => value.trim())
+        .filter((value) => value === 'Grade 11' || value === 'Grade 12'),
+    ),
+  )
+}
+
 export async function saveElection(form: {
   id?: string
   title: string
@@ -78,15 +88,26 @@ export async function savePosition(form: {
   rank_order: number
   eligible_grade_levels: string[]
 }): Promise<ActionResult> {
-  await requireRole('admin')
-  const supabase = await createClient()
-  const { id, ...row } = form
-  const { error } = id
-    ? await supabase.from('positions').update(row).eq('id', id)
-    : await supabase.from('positions').insert(row)
-  if (error) return fail(error, 'Could not save position.')
-  revalidatePath('/admin/candidates')
-  return { ok: true }
+  try {
+    await requireRole('admin')
+    const supabase = await createClient()
+    const { id, ...row } = form
+    const payload = {
+      election_id: row.election_id,
+      position_name: row.position_name.trim(),
+      max_votes: row.max_votes,
+      rank_order: row.rank_order,
+      eligible_grade_levels: normalizeEligibleGradeLevels(row.eligible_grade_levels),
+    }
+    const { error } = id
+      ? await supabase.from('positions').update(payload).eq('id', id)
+      : await supabase.from('positions').insert(payload)
+    if (error) return fail(error, 'Could not save position. Check that the positions table includes eligible_grade_levels.')
+    revalidatePath('/admin/candidates')
+    return { ok: true }
+  } catch (error) {
+    return fail(error, 'Could not save position.')
+  }
 }
 
 export async function deletePosition(id: string): Promise<ActionResult> {

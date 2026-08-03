@@ -20,5 +20,7 @@
 
 delete from public.votes;
 delete from public.abstentions;
+delete from public.vote_tallies;
+delete from public.abstention_tallies;
 delete from public.voting_codes;
 update public.students set status = 'pending';

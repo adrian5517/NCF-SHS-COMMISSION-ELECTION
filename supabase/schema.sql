@@ -107,6 +107,24 @@ create table if not exists public.votes (
 );
 create index if not exists votes_tally_idx on public.votes (election_id, position_id, candidate_id);
 
+-- Persisted tallies keep live results fast and let submit_ballot update the
+-- write path and counts inside the same database transaction.
+create table if not exists public.vote_tallies (
+  election_id uuid not null references public.elections (id) on delete cascade,
+  position_id uuid not null references public.positions (id) on delete cascade,
+  candidate_id uuid not null references public.candidates (id) on delete cascade,
+  votes bigint not null default 0,
+  primary key (election_id, candidate_id)
+);
+create index if not exists vote_tallies_position_idx on public.vote_tallies (election_id, position_id);
+
+insert into public.vote_tallies (election_id, position_id, candidate_id, votes)
+select election_id, position_id, candidate_id, count(*)
+from public.votes
+group by election_id, position_id, candidate_id
+on conflict (election_id, candidate_id)
+do update set votes = excluded.votes;
+
 -- ---------- ABSTENTIONS (anonymous, mirrors votes: no student_id) ----------
 create table if not exists public.abstentions (
   id uuid primary key default gen_random_uuid(),
@@ -115,6 +133,21 @@ create table if not exists public.abstentions (
   created_at timestamptz not null default now()
 );
 create index if not exists abstentions_tally_idx on public.abstentions (election_id, position_id);
+
+create table if not exists public.abstention_tallies (
+  election_id uuid not null references public.elections (id) on delete cascade,
+  position_id uuid not null references public.positions (id) on delete cascade,
+  abstentions bigint not null default 0,
+  primary key (election_id, position_id)
+);
+create index if not exists abstention_tallies_position_idx on public.abstention_tallies (election_id, position_id);
+
+insert into public.abstention_tallies (election_id, position_id, abstentions)
+select election_id, position_id, count(*)
+from public.abstentions
+group by election_id, position_id
+on conflict (election_id, position_id)
+do update set abstentions = excluded.abstentions;
 
 -- ---------- AUDIT LOGS ----------
 create table if not exists public.audit_logs (
@@ -278,6 +311,10 @@ begin
 
     if v_count = 0 then
       insert into public.abstentions (election_id, position_id) values (v_election.id, v_position.id);
+      insert into public.abstention_tallies (election_id, position_id, abstentions)
+      values (v_election.id, v_position.id, 1)
+      on conflict (election_id, position_id)
+      do update set abstentions = public.abstention_tallies.abstentions + 1;
     else
       for v_cand_id in select jsonb_array_elements_text(v_selection) loop
         if not exists (select 1 from public.candidates
@@ -286,6 +323,10 @@ begin
         end if;
         insert into public.votes (election_id, position_id, candidate_id)
         values (v_election.id, v_position.id, v_cand_id::uuid);
+        insert into public.vote_tallies (election_id, position_id, candidate_id, votes)
+        values (v_election.id, v_position.id, v_cand_id::uuid, 1)
+        on conflict (election_id, candidate_id)
+        do update set votes = public.vote_tallies.votes + 1;
       end loop;
     end if;
   end loop;
@@ -330,20 +371,17 @@ begin
   if v_election.hide_live_results and v_election.status not in ('closed', 'archived') then
     v_results := null;
   else
-    -- Tally every candidate's votes once (scoped by election_id so the
-    -- existing votes_tally_idx index covers it), instead of a per-candidate
-    -- correlated subquery run twice — keeps this fast under concurrent load.
+    -- Persisted tallies are updated in submit_ballot's transaction, so live
+    -- stats can read the current counts directly without re-scanning votes.
     with vote_counts as (
-      select candidate_id, count(*) as votes
-      from public.votes
+      select candidate_id, votes
+      from public.vote_tallies
       where election_id = p_election_id
-      group by candidate_id
     ),
     abstain_counts as (
-      select position_id, count(*) as abstained
-      from public.abstentions
+      select position_id, abstentions as abstained
+      from public.abstention_tallies
       where election_id = p_election_id
-      group by position_id
     )
     select jsonb_agg(pos order by pos->'rank_order') into v_results
     from (
@@ -418,6 +456,8 @@ begin
 
   delete from public.votes where election_id = p_election_id;
   delete from public.abstentions where election_id = p_election_id;
+  delete from public.vote_tallies where election_id = p_election_id;
+  delete from public.abstention_tallies where election_id = p_election_id;
   delete from public.voting_codes where election_id = p_election_id;
 
   if v_student_ids is not null then
