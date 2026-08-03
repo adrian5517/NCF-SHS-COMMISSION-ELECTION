@@ -43,6 +43,60 @@ const studentSubmitAttempts = new Map<string, { count: number; resetAt: number }
 const STUDENT_SUBMIT_MAX = 3
 const STUDENT_SUBMIT_WINDOW = 30_000
 
+// Submission dedupe guards: avoid repeated RPC calls from double-clicks/retries.
+const submitInFlight = new Set<string>()
+const recentlySubmitted = new Map<string, number>()
+const RECENTLY_SUBMITTED_TTL = 30_000
+const METRICS_LOG_EVERY_MS = 60_000
+
+const submitMetrics = {
+  preventedInFlight: 0,
+  preventedRecent: 0,
+  successful: 0,
+  failed: 0,
+  lastLogAt: 0,
+}
+
+let lastRecentPruneAt = 0
+
+function pruneRecentlySubmitted(now: number) {
+  if (recentlySubmitted.size === 0) return
+  if (now - lastRecentPruneAt < 30_000 && recentlySubmitted.size < 200) return
+  lastRecentPruneAt = now
+  for (const [key, until] of recentlySubmitted.entries()) {
+    if (until <= now) recentlySubmitted.delete(key)
+  }
+}
+
+function noteSubmitMetric(kind: 'preventedInFlight' | 'preventedRecent' | 'successful' | 'failed') {
+  submitMetrics[kind]++
+  const now = Date.now()
+  if (now - submitMetrics.lastLogAt < METRICS_LOG_EVERY_MS) return
+  submitMetrics.lastLogAt = now
+  console.info('[vote-submit-metrics]', {
+    preventedInFlight: submitMetrics.preventedInFlight,
+    preventedRecent: submitMetrics.preventedRecent,
+    successful: submitMetrics.successful,
+    failed: submitMetrics.failed,
+    activeInFlight: submitInFlight.size,
+    recentCacheSize: recentlySubmitted.size,
+  })
+}
+
+export async function getVoteSubmitMetrics() {
+  const now = Date.now()
+  pruneRecentlySubmitted(now)
+  return {
+    preventedInFlight: submitMetrics.preventedInFlight,
+    preventedRecent: submitMetrics.preventedRecent,
+    successful: submitMetrics.successful,
+    failed: submitMetrics.failed,
+    activeInFlight: submitInFlight.size,
+    recentCacheSize: recentlySubmitted.size,
+    lastLoggedAt: submitMetrics.lastLogAt,
+  }
+}
+
 function studentSubmitLimited(studentId: string): boolean {
   const now = Date.now()
   const entry = studentSubmitAttempts.get(studentId)
@@ -95,28 +149,60 @@ export async function submitBallot(selections: Record<string, string[]>): Promis
   const session = await getStudentSession()
   if (!session) return { ok: false, error: 'Your session expired. Please log in again.' }
 
-  // Per-student retry guard
-  if (studentSubmitLimited(session.studentId)) {
-    return { ok: false, error: 'Too many attempts. Please wait 30 seconds before retrying.' }
+  const dedupeKey = `${session.electionId}:${session.studentId}:${session.codeId}`
+  const now = Date.now()
+  pruneRecentlySubmitted(now)
+  const recentUntil = recentlySubmitted.get(dedupeKey)
+  if (recentUntil && recentUntil > now) {
+    noteSubmitMetric('preventedRecent')
+    return { ok: true }
   }
-
-  // Global flood protection
-  if (globalSubmitLimited()) {
-    return { ok: false, error: 'The system is at capacity. Please wait a moment and tap "Retry".' }
+  if (recentUntil && recentUntil <= now) {
+    recentlySubmitted.delete(dedupeKey)
   }
+  if (submitInFlight.has(dedupeKey)) {
+    noteSubmitMetric('preventedInFlight')
+    return { ok: false, error: 'Your ballot is already being submitted. Please wait.' }
+  }
+  submitInFlight.add(dedupeKey)
 
-  const supabase = await createClient()
-  const { data, error } = await supabase.rpc('submit_ballot', {
-    p_code_id: session.codeId,
-    p_student_id: session.studentId,
-    p_selections: selections,
-    p_grade_level: session.gradeLevel,
-  })
-  if (error) return { ok: false, error: 'Connection problem — your vote was NOT lost. Tap "Submit" to retry.' }
-  if (!data?.ok) return { ok: false, error: data?.error ?? 'Submission failed.' }
+  try {
 
-  await clearStudentSession()
-  return { ok: true }
+    // Per-student retry guard
+    if (studentSubmitLimited(session.studentId)) {
+      noteSubmitMetric('failed')
+      return { ok: false, error: 'Too many attempts. Please wait 30 seconds before retrying.' }
+    }
+
+    // Global flood protection
+    if (globalSubmitLimited()) {
+      noteSubmitMetric('failed')
+      return { ok: false, error: 'The system is at capacity. Please wait a moment and tap "Retry".' }
+    }
+
+    const supabase = await createClient()
+    const { data, error } = await supabase.rpc('submit_ballot', {
+      p_code_id: session.codeId,
+      p_student_id: session.studentId,
+      p_selections: selections,
+      p_grade_level: session.gradeLevel,
+    })
+    if (error) {
+      noteSubmitMetric('failed')
+      return { ok: false, error: 'Connection problem — your vote was NOT lost. Tap "Submit" to retry.' }
+    }
+    if (!data?.ok) {
+      noteSubmitMetric('failed')
+      return { ok: false, error: data?.error ?? 'Submission failed.' }
+    }
+
+    recentlySubmitted.set(dedupeKey, now + RECENTLY_SUBMITTED_TTL)
+    noteSubmitMetric('successful')
+    await clearStudentSession()
+    return { ok: true }
+  } finally {
+    submitInFlight.delete(dedupeKey)
+  }
 }
 
 export async function exitBallot() {

@@ -20,8 +20,8 @@ export function BallotWizard({ ballot, studentName }: { ballot: Ballot; studentN
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
-  const [retryCount, setRetryCount] = useState(0)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const submitInFlightRef = useRef(false)
 
   // Kiosk idle guard: abandon the session and go back to login.
   useEffect(() => {
@@ -39,17 +39,6 @@ export function BallotWizard({ ballot, studentName }: { ballot: Ballot; studentN
       window.removeEventListener('keydown', bump)
     }
   }, [done])
-
-  // Auto-retry once if the server was at capacity.
-  useEffect(() => {
-    if (error?.includes('at capacity') && retryCount < 1) {
-      const id = setTimeout(async () => {
-        setRetryCount((c) => c + 1)
-        await submit()
-      }, 2000)
-      return () => clearTimeout(id)
-    }
-  }, [error, retryCount])
 
   // After the thank-you screen, reset the booth for the next student.
   useEffect(() => {
@@ -90,12 +79,15 @@ export function BallotWizard({ ballot, studentName }: { ballot: Ballot; studentN
   }
 
   async function submit() {
+    if (submitInFlightRef.current || submitting || done) return
+    submitInFlightRef.current = true
     setSubmitting(true)
     setError('')
     const result = await submitBallot(selections)
     setSubmitting(false)
     if (!result.ok) {
       setError(result.error)
+      submitInFlightRef.current = false
       return
     }
     setConfirming(false)

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
+  Activity,
   ClipboardList,
   KeyRound,
   LayoutDashboard,
@@ -25,6 +26,7 @@ const nav = [
   { href: '/admin/students', label: 'Students', icon: Users },
   { href: '/admin/codes', label: 'Voting Codes', icon: KeyRound },
   { href: '/admin/results', label: 'Live Results', icon: Trophy },
+  { href: '/admin/metrics', label: 'Submission Metrics', icon: Activity },
   { href: '/admin/audit', label: 'Audit Log', icon: ScrollText },
 ]
 
