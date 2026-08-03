@@ -7,7 +7,7 @@ import { studentLogin } from '@/lib/actions/vote'
 import { Button } from '@/components/ui/button'
 
 const bigField =
-  'w-full rounded-xl border border-border/70 bg-white/92 py-3.5 pr-4 pl-11 text-base font-semibold tracking-[0.08em] text-foreground uppercase outline-none transition-colors placeholder:normal-case placeholder:tracking-normal placeholder:text-muted-foreground/80 focus:border-primary/60 focus:ring-2 focus:ring-primary/25 min-h-[48px] sm:py-4 sm:text-lg'
+  'w-full rounded-xl border border-border/70 bg-white/92 py-3.5 pr-4 pl-11 text-base font-semibold tracking-[0.08em] text-black uppercase outline-none transition-colors placeholder:normal-case placeholder:tracking-normal placeholder:text-muted-foreground/80 focus:border-primary/60 focus:ring-2 focus:ring-primary/25 min-h-[48px] sm:py-4 sm:text-lg'
 
 // Kiosk login: no navigation chrome, big touch targets, clears itself when idle.
 export default function VotePage() {

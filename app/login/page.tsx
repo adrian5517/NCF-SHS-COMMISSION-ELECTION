@@ -31,7 +31,7 @@ export default function LoginPage() {
             <Image src="/ncf-shs-big.png" alt="NCF SHS Commission on Elections" width={112} height={112} className="h-16 w-16 object-contain sm:h-24 sm:w-24" priority />
           </div>
 
-          <Link href="/" className="mb-4 inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground sm:mb-5 sm:text-sm">
+          <Link href="/" className="mb-4 inline-flex items-center gap-1.5 text-xs text-black transition-colors hover:text-foreground sm:mb-5 sm:text-sm">
             <ArrowLeft className="size-3.5 sm:size-4" /> Back to home
           </Link>
 
