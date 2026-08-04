@@ -87,7 +87,6 @@ export async function savePosition(form: {
   max_votes: number
   rank_order: number
   eligible_grade_levels: string[]
-  plurality_at_large: boolean
 }): Promise<ActionResult> {
   try {
     await requireRole('admin')

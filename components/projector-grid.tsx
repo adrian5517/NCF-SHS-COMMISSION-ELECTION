@@ -32,7 +32,7 @@ export function ProjectorGrid({ stats }: { stats: LiveStats }) {
                 {pos.position_name}
               </h3>
               <span className="shrink-0 text-[clamp(0.65rem,0.72vw,0.9rem)] tracking-wider text-muted-foreground/70 uppercase">
-                {pos.plurality_at_large ? `Pick up to ${pos.candidates.length}` : `Pick ${pos.max_votes}`}
+                Pick {pos.max_votes}
               </span>
             </header>
 

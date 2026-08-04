@@ -52,8 +52,7 @@ create table if not exists public.positions (
   position_name text not null,
   max_votes int not null default 1 check (max_votes >= 1),
   rank_order int not null default 0,
-  eligible_grade_levels text[] not null default '{}',
-  plurality_at_large boolean not null default false
+  eligible_grade_levels text[] not null default '{}'
 );
 create index if not exists positions_election_idx on public.positions (election_id, rank_order);
 
@@ -234,7 +233,6 @@ returns jsonb language sql stable security definer set search_path = public as $
       select jsonb_agg(jsonb_build_object(
         'id', p.id, 'position_name', p.position_name, 'max_votes', p.max_votes,
         'eligible_grade_levels', p.eligible_grade_levels,
-        'plurality_at_large', p.plurality_at_large,
         'candidates', coalesce((
           select jsonb_agg(jsonb_build_object(
             'id', c.id, 'candidate_name', c.candidate_name, 'grade_level', c.grade_level,
@@ -264,11 +262,10 @@ create or replace function public.submit_ballot(
 declare
   v_code public.voting_codes;
   v_election public.elections;
-  v_position public.positions;
-  v_pos_id text;
-  v_cand_id text;
-  v_count int;
-  v_selection jsonb;
+  v_bad_key text;
+  v_bad_candidate uuid;
+  v_too_many public.positions;
+  v_duplicate uuid;
 begin
   -- Lock the code row so two submissions of the same code serialize.
   select * into v_code from public.voting_codes where id = p_code_id for update;
@@ -287,54 +284,98 @@ begin
     return jsonb_build_object('ok', false, 'error', 'The election is not open right now.');
   end if;
 
-  -- Every key in the payload must be a real position in this election
+  -- Every key must be a well-formed UUID for a real position in this election
   -- AND one the student's grade level is allowed to vote in.
-  for v_pos_id in select jsonb_object_keys(p_selections) loop
-    if not exists (select 1 from public.positions
-                   where id = v_pos_id::uuid and election_id = v_election.id
-                     and (eligible_grade_levels = '{}'
-                          or p_grade_level is null
-                          or p_grade_level = any(eligible_grade_levels))) then
-      return jsonb_build_object('ok', false, 'error', 'Ballot mismatch. Please try again.');
-    end if;
-  end loop;
+  select s.key into v_bad_key
+  from jsonb_each(p_selections) s
+  left join public.positions p
+    on p.id = case when s.key ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                   then s.key::uuid end
+    and p.election_id = v_election.id
+    and (p.eligible_grade_levels = '{}' or p_grade_level is null or p_grade_level = any(p.eligible_grade_levels))
+  where p.id is null
+  limit 1;
+  if v_bad_key is not null then
+    return jsonb_build_object('ok', false, 'error', 'Ballot mismatch. Please try again.');
+  end if;
 
-  -- Walk every position the student is eligible for: insert votes for chosen
-  -- candidates, or record an anonymous abstention when they picked no one.
-  for v_position in select * from public.positions where election_id = v_election.id
-    and (eligible_grade_levels = '{}' or p_grade_level is null or p_grade_level = any(eligible_grade_levels)) loop
-    v_selection := coalesce(p_selections->v_position.id::text, '[]'::jsonb);
+  -- Each chosen candidate must exist and belong to the position it is under.
+  select c.id into v_bad_candidate
+  from jsonb_each(p_selections) s
+  cross join lateral jsonb_array_elements_text(s.value) chosen
+  left join public.candidates c
+    on c.id = case when chosen ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                   then chosen::uuid end
+  where c.id is null or c.position_id <> s.key::uuid
+  limit 1;
+  if v_bad_candidate is not null then
+    return jsonb_build_object('ok', false, 'error', 'Ballot mismatch. Please try again.');
+  end if;
 
-    select count(*) into v_count from jsonb_array_elements_text(v_selection);
-    if not v_position.plurality_at_large and v_count > v_position.max_votes then
-      return jsonb_build_object('ok', false, 'error',
-        format('Too many choices for %s (max %s).', v_position.position_name, v_position.max_votes));
-    end if;
-    if (select count(distinct j.value) from jsonb_array_elements_text(v_selection) j) <> v_count then
-      return jsonb_build_object('ok', false, 'error', 'Ballot mismatch. Please try again.');
-    end if;
+  -- Positions respect their max_votes cap.
+  select p.* into v_too_many
+  from jsonb_each(p_selections) s
+  join public.positions p on p.id = s.key::uuid
+  where jsonb_array_length(s.value) > p.max_votes
+  limit 1;
+  if v_too_many.id is not null then
+    return jsonb_build_object('ok', false, 'error',
+      format('Too many choices for %s (max %s).', v_too_many.position_name, v_too_many.max_votes));
+  end if;
 
-    if v_count = 0 then
-      insert into public.abstentions (election_id, position_id) values (v_election.id, v_position.id);
-      insert into public.abstention_tallies (election_id, position_id, abstentions)
-      values (v_election.id, v_position.id, 1)
-      on conflict (election_id, position_id)
-      do update set abstentions = public.abstention_tallies.abstentions + 1;
-    else
-      for v_cand_id in select jsonb_array_elements_text(v_selection) loop
-        if not exists (select 1 from public.candidates
-                       where id = v_cand_id::uuid and position_id = v_position.id) then
-          return jsonb_build_object('ok', false, 'error', 'Ballot mismatch. Please try again.');
-        end if;
-        insert into public.votes (election_id, position_id, candidate_id)
-        values (v_election.id, v_position.id, v_cand_id::uuid);
-        insert into public.vote_tallies (election_id, position_id, candidate_id, votes)
-        values (v_election.id, v_position.id, v_cand_id::uuid, 1)
-        on conflict (election_id, candidate_id)
-        do update set votes = public.vote_tallies.votes + 1;
-      end loop;
-    end if;
-  end loop;
+  -- No candidate may be selected twice anywhere on the ballot.
+  select chosen::uuid into v_duplicate
+  from jsonb_each(p_selections) s
+  cross join lateral jsonb_array_elements_text(s.value) chosen
+  where chosen ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+  group by chosen
+  having count(*) > 1
+  limit 1;
+  if v_duplicate is not null then
+    return jsonb_build_object('ok', false, 'error', 'Ballot mismatch. Please try again.');
+  end if;
+
+  -- Bulk-insert the votes (keys and candidates already validated above).
+  insert into public.votes (election_id, position_id, candidate_id)
+  select v_election.id, s.key::uuid, c.id
+  from jsonb_each(p_selections) s
+  cross join lateral jsonb_array_elements_text(s.value) chosen
+  join public.candidates c on c.id = chosen::uuid and c.position_id = s.key::uuid;
+
+  -- Bulk-bump the persisted vote tallies.
+  insert into public.vote_tallies (election_id, position_id, candidate_id, votes)
+  select v_election.id, s.key::uuid, c.id, count(*)::bigint
+  from jsonb_each(p_selections) s
+  cross join lateral jsonb_array_elements_text(s.value) chosen
+  join public.candidates c on c.id = chosen::uuid and c.position_id = s.key::uuid
+  group by s.key, c.id
+  on conflict (election_id, candidate_id)
+  do update set votes = public.vote_tallies.votes + excluded.votes;
+
+  -- Record an abstention for every eligible position the voter left empty.
+  insert into public.abstentions (election_id, position_id)
+  select v_election.id, p.id
+  from public.positions p
+  where p.election_id = v_election.id
+    and (p.eligible_grade_levels = '{}' or p_grade_level is null or p_grade_level = any(p.eligible_grade_levels))
+    and not exists (
+      select 1 from jsonb_each(p_selections) s
+      where s.key::uuid = p.id and jsonb_array_length(s.value) > 0
+    );
+
+  -- Bulk-bump the abstention tallies.
+  insert into public.abstention_tallies (election_id, position_id, abstentions)
+  select v_election.id, p.id, count(*)::bigint
+  from public.positions p
+  where p.election_id = v_election.id
+    and (p.eligible_grade_levels = '{}' or p_grade_level is null or p_grade_level = any(p.eligible_grade_levels))
+    and not exists (
+      select 1 from jsonb_each(p_selections) s
+      where s.key::uuid = p.id and jsonb_array_length(s.value) > 0
+    )
+  group by p.id
+  on conflict (election_id, position_id)
+  do update set abstentions = public.abstention_tallies.abstentions + excluded.abstentions;
 
   update public.voting_codes set is_used = true where id = v_code.id;
   update public.students set status = 'voted' where id = p_student_id;
@@ -395,7 +436,6 @@ begin
         'position_name', p.position_name,
         'max_votes', p.max_votes,
         'rank_order', p.rank_order,
-        'plurality_at_large', p.plurality_at_large,
         'abstain_count', coalesce(ac.abstained, 0),
         'candidates', coalesce((
           select jsonb_agg(jsonb_build_object(

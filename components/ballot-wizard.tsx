@@ -220,9 +220,7 @@ export function BallotWizard({ ballot, studentName }: { ballot: Ballot; studentN
               <h1 className="text-3xl font-bold sm:text-4xl">{position.position_name}</h1>
               <p className="mt-1.5 text-muted-foreground">
                 {(() => {
-                  const cap = position.plurality_at_large
-                    ? position.candidates.length
-                    : Math.min(position.max_votes, position.candidates.length)
+                  const cap = Math.min(position.max_votes, position.candidates.length)
                   return cap <= 1
                     ? 'Tap one candidate to choose.'
                     : `Choose up to ${cap} candidates. (${selectedHere.length}/${cap} selected)`
@@ -233,9 +231,7 @@ export function BallotWizard({ ballot, studentName }: { ballot: Ballot; studentN
                 {position.candidates.map((c, i) => {
                   const selected = selectedHere.includes(c.id)
                   const accent = c.party_color || 'var(--primary)'
-                  const cap = position.plurality_at_large
-                    ? position.candidates.length
-                    : Math.min(position.max_votes, position.candidates.length)
+                  const cap = Math.min(position.max_votes, position.candidates.length)
                   return (
                     <motion.button
                       key={c.id}

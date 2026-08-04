@@ -21,7 +21,6 @@ export interface LiveStats {
         position_name: string
         max_votes: number
         rank_order: number
-        plurality_at_large: boolean
         abstain_count: number
         candidates: {
           id: string
@@ -278,9 +277,7 @@ export function ResultsBoard({
                 <div className="flex items-baseline justify-between">
                   <h3 className={`font-semibold ${big ? 'text-2xl' : 'text-lg'}`}>{pos.position_name}</h3>
                   <span className="text-right text-xs text-muted-foreground">
-                    {pos.plurality_at_large
-                      ? `vote for up to ${pos.candidates.length}`
-                      : `vote for ${pos.max_votes}`}
+                    vote for {pos.max_votes}
                     {pos.abstain_count > 0 && (
                       <>
                         <br />
@@ -313,9 +310,7 @@ export function ResultsBoard({
               <div className="flex items-baseline justify-between">
                 <h3 className={`font-semibold ${big ? 'text-2xl' : 'text-lg'}`}>{pos.position_name}</h3>
                 <span className="text-right text-xs text-muted-foreground">
-                  {pos.plurality_at_large
-                    ? `vote for up to ${pos.candidates.length}`
-                    : `vote for ${pos.max_votes}`}
+                  vote for {pos.max_votes}
                   {pos.abstain_count > 0 && (
                     <>
                       <br />

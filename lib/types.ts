@@ -26,7 +26,6 @@ export interface Position {
   max_votes: number
   rank_order: number
   eligible_grade_levels: string[]
-  plurality_at_large: boolean
 }
 
 export interface Candidate {
@@ -76,7 +75,6 @@ export interface BallotPosition {
   position_name: string
   max_votes: number
   eligible_grade_levels: string[]
-  plurality_at_large: boolean
   candidates: BallotCandidate[]
 }
 

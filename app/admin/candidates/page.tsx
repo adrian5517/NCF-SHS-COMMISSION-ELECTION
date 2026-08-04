@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Pencil, Plus, Trash2, Upload, UserRound } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { deleteCandidate, deletePosition, saveCandidate, savePosition } from '@/lib/actions/elections'
@@ -27,11 +27,18 @@ export default function CandidatesPage() {
   const [electionId, setElectionId] = useState('')
   const [positions, setPositions] = useState<Position[]>([])
   const [candidates, setCandidates] = useState<Candidate[]>([])
-  const [posForm, setPosForm] = useState<{ id?: string; position_name: string; max_votes: number; rank_order: number; eligible_grade_levels: string[]; plurality_at_large: boolean } | null>(null)
+  const [posForm, setPosForm] = useState<{ id?: string; position_name: string; max_votes: number; rank_order: number; eligible_grade_levels: string[] } | null>(null)
   const [candForm, setCandForm] = useState<(typeof emptyCandidate & { id?: string; position_id: string }) | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [gradeFilter, setGradeFilter] = useState('all')
+  const posFormRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (posForm) {
+      requestAnimationFrame(() => posFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+    }
+  }, [posForm])
 
   useEffect(() => {
     createClient()
@@ -107,12 +114,13 @@ export default function CandidatesPage() {
         <div className="mt-6 space-y-6">
           <Button
             variant="outline"
-            onClick={() => setPosForm({ position_name: '', max_votes: 1, rank_order: positions.length + 1, eligible_grade_levels: [], plurality_at_large: false })}
+            onClick={() => setPosForm({ position_name: '', max_votes: 1, rank_order: positions.length + 1, eligible_grade_levels: [] })}
           >
             <Plus data-icon="inline-start" /> Add position
           </Button>
 
           {posForm && (
+            <div ref={posFormRef}>
             <form
               className="glass grid gap-4 rounded-2xl p-6 sm:grid-cols-4"
               onSubmit={async (e) => {
@@ -218,20 +226,6 @@ export default function CandidatesPage() {
                   ))}
                 </div>
               </div>
-              <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-border bg-background/40 px-3 py-2.5 text-sm sm:col-span-4">
-                <input
-                  type="checkbox"
-                  checked={posForm.plurality_at_large}
-                  onChange={(e) => setPosForm({ ...posForm, plurality_at_large: e.target.checked })}
-                  className="size-4"
-                />
-                <span>
-                  <span className="font-medium">Plurality-at-large voting</span>
-                  <span className="block text-xs text-muted-foreground">
-                    Voters may choose up to all candidates (no max-votes cap). Use for multi-seat positions like Councilors.
-                  </span>
-                </span>
-              </label>
               <div className="flex gap-2 sm:col-span-4">
                 <Button type="submit" disabled={busy}>
                   Save position
@@ -241,6 +235,7 @@ export default function CandidatesPage() {
                 </Button>
               </div>
             </form>
+            </div>
           )}
 
           {positions
@@ -258,7 +253,7 @@ export default function CandidatesPage() {
                   <div>
                     <h2 className="text-lg font-semibold">{pos.position_name}</h2>
                     <p className="text-xs text-muted-foreground">
-                      {pos.plurality_at_large ? 'Plurality-at-large' : `Vote for ${pos.max_votes}`} · ballot order {pos.rank_order} ·{' '}
+                      Vote for {pos.max_votes} · ballot order {pos.rank_order} ·{' '}
                       {(pos.eligible_grade_levels ?? []).length === 0
                         ? 'open to all grades'
                         : `voters: ${(pos.eligible_grade_levels ?? []).join(', ')}`}
@@ -282,7 +277,6 @@ export default function CandidatesPage() {
                           max_votes: pos.max_votes,
                           rank_order: pos.rank_order,
                           eligible_grade_levels: pos.eligible_grade_levels ?? [],
-                          plurality_at_large: pos.plurality_at_large ?? false,
                         })
                       }
                     >
