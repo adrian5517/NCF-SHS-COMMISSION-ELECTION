@@ -201,7 +201,7 @@ export default function StudentsPage() {
             const result = await saveStudent(form)
             showMessage(result, 'Student added.')
             if (result.ok) {
-              setForm({ lrn: '', full_name: '', grade_level: '', section: '' })
+              setForm({ lrn: '', full_name: '', grade_level: '', section: '', strand: '' })
               setAdding(false)
               load()
             }

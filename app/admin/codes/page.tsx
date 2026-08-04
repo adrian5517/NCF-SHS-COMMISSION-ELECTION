@@ -35,6 +35,15 @@ function Countdown({ expiresAt }: { expiresAt: string }) {
 type CodeStatus = 'no-code' | 'active' | 'expired' | 'voted'
 type SortKey = 'name' | 'id' | 'newest'
 
+function escapeHtml(value: string) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
+}
+
 export default function CodesPage() {
   const [election, setElection] = useState<Election | null>(null)
   const [students, setStudents] = useState<Student[]>([])
@@ -154,7 +163,7 @@ export default function CodesPage() {
       rows.push(`<section style="page-break-before:auto;margin-bottom:1.5rem">`)
       for (const section of Object.keys(byGrade[grade]).sort()) {
         const list = byGrade[grade][section].sort((a, b) => a.full_name.localeCompare(b.full_name))
-        rows.push(`<h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.25rem;color:#555">Grade ${grade} — Section ${section} <span style="font-weight:400;color:#999">(${list.length} students)</span></h3>`)
+        rows.push(`<h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.25rem;color:#555">Grade ${escapeHtml(grade)} — Section ${escapeHtml(section)} <span style="font-weight:400;color:#999">(${list.length} students)</span></h3>`)
         rows.push(`<table style="width:100%;border-collapse:collapse;font-size:0.8rem">`)
         rows.push(`<thead><tr style="border-bottom:2px solid #222;text-align:left">`)
         rows.push(`<th style="padding:4px 8px">#</th>`)
@@ -167,9 +176,9 @@ export default function CodesPage() {
           const code = latestCode.get(s.id)!
           rows.push(`<tr style="border-bottom:1px solid #ddd">`)
           rows.push(`<td style="padding:3px 8px;color:#888;width:2rem">${i + 1}</td>`)
-          rows.push(`<td style="padding:3px 8px">${s.full_name}</td>`)
-          rows.push(`<td style="padding:3px 8px;font-family:monospace;font-size:0.75rem">${s.lrn}</td>`)
-          rows.push(`<td style="padding:3px 8px;font-family:monospace;font-weight:700;letter-spacing:0.08em">${code.code}</td>`)
+          rows.push(`<td style="padding:3px 8px">${escapeHtml(s.full_name)}</td>`)
+          rows.push(`<td style="padding:3px 8px;font-family:monospace;font-size:0.75rem">${escapeHtml(s.lrn)}</td>`)
+          rows.push(`<td style="padding:3px 8px;font-family:monospace;font-weight:700;letter-spacing:0.08em">${escapeHtml(code.code)}</td>`)
           rows.push(`<td style="padding:3px 8px;font-size:0.7rem;color:${s.status === 'voted' ? '#16a34a' : '#888'}">${s.status === 'voted' ? 'VOTED' : 'pending'}</td>`)
           rows.push(`</tr>`)
         })
@@ -182,7 +191,7 @@ export default function CodesPage() {
     if (!w) return
     w.document.write(`<!DOCTYPE html>
 <html>
-<head><title>Voting Codes — ${election?.title ?? ''}</title>
+<head><title>Voting Codes — ${escapeHtml(election?.title ?? '')}</title>
 <style>
   @page { margin: 1.5cm }
   * { box-sizing:border-box; margin:0; padding:0 }
@@ -200,7 +209,7 @@ export default function CodesPage() {
 <header>
   <img src="/ncf-shs.png" alt="" />
   <div>
-    <h1>Voting Codes — ${election?.title ?? ''}</h1>
+    <h1>Voting Codes — ${escapeHtml(election?.title ?? '')}</h1>
     <p>Generated ${new Date().toLocaleString()} &middot; ${Object.values(byGrade).reduce((s, sections) => s + Object.values(sections).reduce((a, l) => a + l.length, 0), 0)} students${grade ? ` &middot; Grade ${grade}` : ''}${section ? ` &middot; ${section}` : ''}</p>
   </div>
 </header>
@@ -259,7 +268,7 @@ ${rows.join('\n')}
             disabled={resetting}
             onClick={async () => {
               const typed = prompt(
-                `This permanently deletes ALL cast votes and voting codes for "${election.title}", and puts every student who voted back to pending so the election can be re-run.\n\nThis cannot be undone.\n\nType the election title to confirm:`,
+                `This permanently deletes ALL votes, abstentions, tallies, and voting codes, then sets EVERY student back to pending.\n\nThis cannot be undone.\n\nType the election title to confirm:`,
               )
               if (typed !== election.title) {
                 if (typed !== null) alert('Title did not match — reset cancelled.')

@@ -80,6 +80,17 @@ export function BallotWizard({ ballot, studentName }: { ballot: Ballot; studentN
 
   async function submit() {
     if (submitInFlightRef.current || submitting || done) return
+    const overLimit = positions.find((position) => {
+      const cap = Math.min(position.max_votes, position.candidates.length)
+      return (selections[position.id] ?? []).length > cap
+    })
+    if (overLimit) {
+      const cap = Math.min(overLimit.max_votes, overLimit.candidates.length)
+      showToast(`Too many choices for ${overLimit.position_name}. Choose up to ${cap}.`)
+      setStep(positions.findIndex((position) => position.id === overLimit.id))
+      setConfirming(false)
+      return
+    }
     submitInFlightRef.current = true
     setSubmitting(true)
     setError('')

@@ -149,6 +149,39 @@ group by election_id, position_id
 on conflict (election_id, position_id)
 do update set abstentions = excluded.abstentions;
 
+-- ---------- SUBMISSION DEDUPE ----------
+-- Keeps ballot replay protection consistent across app restarts and multiple
+-- server instances. A successful submit inserts exactly one row per code_id.
+create table if not exists public.ballot_submissions (
+  code_id uuid primary key references public.voting_codes (id) on delete cascade,
+  election_id uuid not null references public.elections (id) on delete cascade,
+  student_id uuid not null references public.students (id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+create index if not exists ballot_submissions_election_idx on public.ballot_submissions (election_id, created_at desc);
+
+-- ---------- LOGIN THROTTLES ----------
+-- Tracks repeated login attempts by IP+LRN so brute-force protection survives
+-- restarts and scales across multiple app instances.
+create table if not exists public.login_attempts (
+  attempt_key text primary key,
+  attempt_count int not null default 0,
+  reset_at timestamptz not null,
+  updated_at timestamptz not null default now()
+);
+create index if not exists login_attempts_reset_idx on public.login_attempts (reset_at);
+
+-- ---------- SUBMIT THROTTLES ----------
+-- Shared counters for ballot submit flood protection and per-student retry
+-- limits. This keeps the app behavior consistent across instances.
+create table if not exists public.submit_attempts (
+  attempt_key text primary key,
+  attempt_count int not null default 0,
+  reset_at timestamptz not null,
+  updated_at timestamptz not null default now()
+);
+create index if not exists submit_attempts_reset_idx on public.submit_attempts (reset_at);
+
 -- ---------- AUDIT LOGS ----------
 create table if not exists public.audit_logs (
   id uuid primary key default gen_random_uuid(),
@@ -262,6 +295,7 @@ create or replace function public.submit_ballot(
 declare
   v_code public.voting_codes;
   v_election public.elections;
+  v_submission_code_id uuid;
   v_bad_key text;
   v_bad_candidate uuid;
   v_too_many public.positions;
@@ -335,6 +369,16 @@ begin
     return jsonb_build_object('ok', false, 'error', 'Ballot mismatch. Please try again.');
   end if;
 
+  -- Mark the submission only after validation passes. The locked code row still
+  -- serializes concurrent requests, while invalid ballots remain retryable.
+  insert into public.ballot_submissions (code_id, election_id, student_id)
+  values (v_code.id, v_election.id, p_student_id)
+  on conflict (code_id) do nothing
+  returning code_id into v_submission_code_id;
+  if v_submission_code_id is null then
+    return jsonb_build_object('ok', false, 'error', 'This ballot was already submitted.');
+  end if;
+
   -- Bulk-insert the votes (keys and candidates already validated above).
   insert into public.votes (election_id, position_id, candidate_id)
   select v_election.id, s.key::uuid, c.id
@@ -381,6 +425,119 @@ begin
   update public.students set status = 'voted' where id = p_student_id;
 
   return jsonb_build_object('ok', true);
+end $$;
+
+-- ============================================================
+-- RPC: login attempt limiter for the kiosk sign-in flow.
+-- Returns {"ok": true} when the attempt may proceed, or an
+-- error payload when the key is over limit.
+-- ============================================================
+create or replace function public.check_login_attempt_limit(
+  p_attempt_key text,
+  p_window_ms int default 60000,
+  p_max_attempts int default 8
+) returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_now timestamptz := now();
+  v_row public.login_attempts;
+begin
+  insert into public.login_attempts (attempt_key, attempt_count, reset_at, updated_at)
+  values (p_attempt_key, 1, v_now + make_interval(secs => p_window_ms / 1000.0), v_now)
+  on conflict (attempt_key) do update
+  set attempt_count = case
+        when public.login_attempts.reset_at < v_now then 1
+        else public.login_attempts.attempt_count + 1
+      end,
+      reset_at = case
+        when public.login_attempts.reset_at < v_now then v_now + make_interval(secs => p_window_ms / 1000.0)
+        else public.login_attempts.reset_at
+      end,
+      updated_at = v_now
+  returning * into v_row;
+
+  if v_row.attempt_count > p_max_attempts then
+    return jsonb_build_object('ok', false, 'error', 'Too many attempts. Please wait a minute and try again.');
+  end if;
+
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- ============================================================
+-- RPC: submit attempt limiter for flood control and per-student retries.
+-- p_attempt_key can be a shared global key or a student-specific key.
+-- ============================================================
+create or replace function public.check_submit_attempt_limit(
+  p_attempt_key text,
+  p_window_ms int,
+  p_max_attempts int
+) returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_now timestamptz := now();
+  v_row public.submit_attempts;
+begin
+  insert into public.submit_attempts (attempt_key, attempt_count, reset_at, updated_at)
+  values (p_attempt_key, 1, v_now + make_interval(secs => p_window_ms / 1000.0), v_now)
+  on conflict (attempt_key) do update
+  set attempt_count = case
+        when public.submit_attempts.reset_at < v_now then 1
+        else public.submit_attempts.attempt_count + 1
+      end,
+      reset_at = case
+        when public.submit_attempts.reset_at < v_now then v_now + make_interval(secs => p_window_ms / 1000.0)
+        else public.submit_attempts.reset_at
+      end,
+      updated_at = v_now
+  returning * into v_row;
+
+  if v_row.attempt_count > p_max_attempts then
+    return jsonb_build_object('ok', false, 'error', 'Too many attempts. Please wait and try again.');
+  end if;
+
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- ============================================================
+-- RPC: atomically replace unused voting codes for a set of students.
+-- Each row in p_rows must contain student_id, code, and expires_at.
+-- ============================================================
+create or replace function public.replace_voting_codes(
+  p_election_id uuid,
+  p_rows jsonb,
+  p_force boolean default false
+) returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_row jsonb;
+  v_student_ids uuid[] := '{}';
+  v_inserted int := 0;
+begin
+  for v_row in select * from jsonb_array_elements(p_rows)
+  loop
+    v_student_ids := array_append(v_student_ids, (v_row->>'student_id')::uuid);
+  end loop;
+
+  if coalesce(array_length(v_student_ids, 1), 0) = 0 then
+    return jsonb_build_object('ok', true, 'count', 0, 'skipped', 0);
+  end if;
+
+  delete from public.voting_codes
+  where election_id = p_election_id
+    and is_used = false
+    and student_id = any(v_student_ids)
+    and (p_force or expires_at < now());
+
+  for v_row in select * from jsonb_array_elements(p_rows)
+  loop
+    insert into public.voting_codes (student_id, election_id, code, expires_at)
+    values (
+      (v_row->>'student_id')::uuid,
+      p_election_id,
+      v_row->>'code',
+      (v_row->>'expires_at')::timestamptz
+    );
+    v_inserted := v_inserted + 1;
+  end loop;
+
+  return jsonb_build_object('ok', true, 'count', v_inserted);
 end $$;
 
 -- ============================================================
@@ -488,32 +645,27 @@ end $$;
 create or replace function public.reset_election_votes(p_election_id uuid)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare
-  v_student_ids uuid[];
   v_vote_count int;
+  v_student_count int;
 begin
   if not public.is_admin() then
     return jsonb_build_object('ok', false, 'error', 'Only admins can reset an election.');
   end if;
 
-  select array_agg(student_id) into v_student_ids
-    from public.voting_codes where election_id = p_election_id and is_used = true;
+  select count(*) into v_vote_count from public.votes;
 
-  select count(*) into v_vote_count from public.votes where election_id = p_election_id;
-
-  delete from public.votes where election_id = p_election_id;
-  delete from public.abstentions where election_id = p_election_id;
-  delete from public.vote_tallies where election_id = p_election_id;
-  delete from public.abstention_tallies where election_id = p_election_id;
-  delete from public.voting_codes where election_id = p_election_id;
-
-  if v_student_ids is not null then
-    update public.students set status = 'pending' where id = any(v_student_ids);
-  end if;
+  delete from public.votes;
+  delete from public.abstentions;
+  delete from public.vote_tallies;
+  delete from public.abstention_tallies;
+  delete from public.voting_codes;
+  update public.students set status = 'pending';
+  get diagnostics v_student_count = row_count;
 
   return jsonb_build_object(
     'ok', true,
     'votes_deleted', v_vote_count,
-    'students_reset', coalesce(array_length(v_student_ids, 1), 0)
+    'students_reset', v_student_count
   );
 end $$;
 
@@ -528,6 +680,9 @@ revoke all on function public.get_active_election() from public;
 revoke all on function public.get_live_stats(uuid) from public;
 grant execute on function public.get_active_election() to anon, authenticated;
 grant execute on function public.get_live_stats(uuid) to anon, authenticated;
+grant execute on function public.check_login_attempt_limit(text, int, int) to service_role;
+grant execute on function public.check_submit_attempt_limit(text, int, int) to service_role;
+grant execute on function public.replace_voting_codes(uuid, jsonb, boolean) to service_role;
 revoke all on function public.reset_election_votes(uuid) from public;
 grant execute on function public.reset_election_votes(uuid) to authenticated;
 
@@ -545,6 +700,9 @@ alter table public.voting_codes enable row level security;
 alter table public.votes enable row level security;
 alter table public.abstentions enable row level security;
 alter table public.audit_logs enable row level security;
+alter table public.ballot_submissions enable row level security;
+alter table public.login_attempts enable row level security;
+alter table public.submit_attempts enable row level security;
 
 drop policy if exists "profiles self read" on public.profiles;
 create policy "profiles self read" on public.profiles for select using (auth.uid() = id or public.is_admin());
@@ -586,6 +744,15 @@ drop policy if exists "staff read audit" on public.audit_logs;
 create policy "staff read audit" on public.audit_logs for select using (public.is_staff());
 drop policy if exists "staff write audit" on public.audit_logs;
 create policy "staff write audit" on public.audit_logs for insert with check (public.is_staff());
+
+drop policy if exists "staff read submissions" on public.ballot_submissions;
+create policy "staff read submissions" on public.ballot_submissions for select using (public.is_staff());
+
+drop policy if exists "staff read login attempts" on public.login_attempts;
+create policy "staff read login attempts" on public.login_attempts for select using (public.is_staff());
+
+drop policy if exists "staff read submit attempts" on public.submit_attempts;
+create policy "staff read submit attempts" on public.submit_attempts for select using (public.is_staff());
 
 -- ============================================================
 -- REALTIME: broadcast changes on the tables the dashboards watch.

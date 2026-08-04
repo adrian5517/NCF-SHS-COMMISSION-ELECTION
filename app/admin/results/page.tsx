@@ -7,7 +7,7 @@ import { ResultsBoard, TurnoutMeter, useLiveStats, type LiveStats } from '@/comp
 import { logAudit } from '@/lib/actions/staff'
 import { Button } from '@/components/ui/button'
 
-function exportCsv(stats: LiveStats) {
+async function exportCsv(stats: LiveStats) {
   const lines = ['position,candidate,party_list,votes']
   for (const pos of stats.results ?? []) {
     for (const c of pos.candidates) {
@@ -24,9 +24,14 @@ function exportCsv(stats: LiveStats) {
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
   a.download = `${stats.election.title.replaceAll(' ', '-')}-results.csv`
-  a.click()
-  URL.revokeObjectURL(a.href)
-  logAudit('Results exported (CSV)', { election_id: stats.election.id })
+  try {
+    await logAudit('Results exported (CSV)', { election_id: stats.election.id })
+  } catch {
+    // Export should still work even if audit logging is temporarily unavailable.
+  } finally {
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
 }
 
 export default function ResultsPage() {
@@ -60,7 +65,7 @@ function Dashboard({ electionId }: { electionId: string }) {
           <p className="mt-1 text-sm text-muted-foreground">{stats.election.title} — updates in realtime</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" disabled={!stats.results} onClick={() => exportCsv(stats)}>
+          <Button variant="outline" disabled={!stats.results} onClick={() => void exportCsv(stats)}>
             <Download data-icon="inline-start" /> Export CSV
           </Button>
           <Button variant="outline" onClick={() => window.print()}>

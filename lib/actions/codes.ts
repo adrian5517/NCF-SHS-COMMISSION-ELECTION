@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { randomBytes } from 'node:crypto'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { logAudit, requireRole } from '@/lib/actions/staff'
 import type { ActionResult } from '@/lib/types'
 
@@ -25,7 +25,7 @@ export async function bulkGenerateCodes(params: {
   force?: boolean
 }): Promise<ActionResult<{ count: number; skipped: number }>> {
   await requireRole('admin')
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   let baseQuery = supabase.from('students').select('id').eq('status', 'pending')
   if (params.gradeLevel) baseQuery = baseQuery.eq('grade_level', params.gradeLevel)
@@ -86,22 +86,16 @@ export async function bulkGenerateCodes(params: {
     expires_at: expiresAt,
   }))
 
-  // Clear out any stale (expired or, if forced, still-active) unused codes for these students first.
   const INSERT_CHUNK = 500
-  for (let i = 0; i < targetIds.length; i += INSERT_CHUNK) {
-    const chunk = targetIds.slice(i, i + INSERT_CHUNK)
-    await supabase
-      .from('voting_codes')
-      .delete()
-      .eq('election_id', params.electionId)
-      .eq('is_used', false)
-      .in('student_id', chunk)
-  }
-
   for (let i = 0; i < rows.length; i += INSERT_CHUNK) {
     const chunk = rows.slice(i, i + INSERT_CHUNK)
-    const { error: insertError } = await supabase.from('voting_codes').insert(chunk)
-    if (insertError) return { ok: false, error: insertError.message }
+    const { data, error } = await supabase.rpc('replace_voting_codes', {
+      p_election_id: params.electionId,
+      p_rows: chunk,
+      p_force: params.force ?? false,
+    })
+    if (error) return { ok: false, error: error.message }
+    if (!data?.ok) return { ok: false, error: data?.error ?? 'Could not generate codes.' }
   }
 
   await logAudit('Bulk codes generated', {
@@ -122,23 +116,21 @@ export async function regenerateCode(params: {
   minutes: number
 }): Promise<ActionResult<{ code: string }>> {
   await requireRole('admin')
-  const supabase = await createClient()
-
-  await supabase
-    .from('voting_codes')
-    .delete()
-    .eq('election_id', params.electionId)
-    .eq('student_id', params.studentId)
-    .eq('is_used', false)
-
   const code = generateCode()
-  const { error } = await supabase.from('voting_codes').insert({
-    student_id: params.studentId,
-    election_id: params.electionId,
-    code,
-    expires_at: params.minutes === -1 ? '9999-12-31T23:59:59Z' : new Date(Date.now() + params.minutes * 60_000).toISOString(),
+  const supabase = createAdminClient()
+  const { data, error } = await supabase.rpc('replace_voting_codes', {
+    p_election_id: params.electionId,
+    p_rows: [
+      {
+        student_id: params.studentId,
+        code,
+        expires_at: params.minutes === -1 ? '9999-12-31T23:59:59Z' : new Date(Date.now() + params.minutes * 60_000).toISOString(),
+      },
+    ],
+    p_force: true,
   })
   if (error) return { ok: false, error: error.message }
+  if (!data?.ok) return { ok: false, error: data?.error ?? 'Could not regenerate code.' }
 
   await logAudit('Code regenerated', { student_id: params.studentId })
   revalidatePath('/admin/codes')
@@ -149,7 +141,7 @@ export async function resetElectionVotes(
   electionId: string,
 ): Promise<ActionResult<{ votesDeleted: number; studentsReset: number }>> {
   await requireRole('admin')
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const { data, error } = await supabase.rpc('reset_election_votes', { p_election_id: electionId })
   if (error) return { ok: false, error: error.message }
