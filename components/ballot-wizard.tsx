@@ -44,7 +44,7 @@ export function BallotWizard({ ballot, studentName }: { ballot: Ballot; studentN
   useEffect(() => {
     if (!done) return
     const id = setTimeout(() => {
-      window.location.href = '/vote'
+      exitBallot()
     }, 6000)
     return () => clearTimeout(id)
   }, [done])
@@ -458,9 +458,6 @@ export function BallotWizard({ ballot, studentName }: { ballot: Ballot; studentN
                 <Button
                   size="lg"
                   className="h-12 text-base"
-                  onClickCapture={() => {
-                    if (!submitting && !done) setSubmitting(true)
-                  }}
                   onClick={submit}
                   disabled={submitting}
                 >

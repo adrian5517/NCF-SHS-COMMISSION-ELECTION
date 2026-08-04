@@ -213,7 +213,8 @@ export async function submitBallot(selections: Record<string, string[]>): Promis
 
     recentlySubmitted.set(dedupeKey, now + RECENTLY_SUBMITTED_TTL)
     noteSubmitMetric('successful')
-    await clearStudentSession()
+    // Session is intentionally kept until the thank-you screen has shown;
+    // exitBallot() clears it when the booth resets.
     return { ok: true }
   } finally {
     if (dedupeKey) {
