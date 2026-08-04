@@ -131,10 +131,12 @@ export async function studentLogin(_prev: ActionResult | null, formData: FormDat
       codeId: data.code_id,
       electionId: data.election_id,
     })
-    redirect('/ballot')
   } catch {
     return { ok: false, error: 'Unexpected login error. Please try again.' }
   }
+  // Outside the try: redirect() signals navigation by throwing, so it must
+  // never be swallowed by the error handler above.
+  redirect('/ballot')
 }
 
 export async function getBallotForSession(): Promise<{ ballot: Ballot; studentName: string } | null> {
