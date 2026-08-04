@@ -52,7 +52,8 @@ create table if not exists public.positions (
   position_name text not null,
   max_votes int not null default 1 check (max_votes >= 1),
   rank_order int not null default 0,
-  eligible_grade_levels text[] not null default '{}'
+  eligible_grade_levels text[] not null default '{}',
+  plurality_at_large boolean not null default false
 );
 create index if not exists positions_election_idx on public.positions (election_id, rank_order);
 
@@ -233,6 +234,7 @@ returns jsonb language sql stable security definer set search_path = public as $
       select jsonb_agg(jsonb_build_object(
         'id', p.id, 'position_name', p.position_name, 'max_votes', p.max_votes,
         'eligible_grade_levels', p.eligible_grade_levels,
+        'plurality_at_large', p.plurality_at_large,
         'candidates', coalesce((
           select jsonb_agg(jsonb_build_object(
             'id', c.id, 'candidate_name', c.candidate_name, 'grade_level', c.grade_level,
@@ -304,9 +306,12 @@ begin
     v_selection := coalesce(p_selections->v_position.id::text, '[]'::jsonb);
 
     select count(*) into v_count from jsonb_array_elements_text(v_selection);
-    if v_count > v_position.max_votes then
+    if not v_position.plurality_at_large and v_count > v_position.max_votes then
       return jsonb_build_object('ok', false, 'error',
         format('Too many choices for %s (max %s).', v_position.position_name, v_position.max_votes));
+    end if;
+    if (select count(distinct j.value) from jsonb_array_elements_text(v_selection) j) <> v_count then
+      return jsonb_build_object('ok', false, 'error', 'Ballot mismatch. Please try again.');
     end if;
 
     if v_count = 0 then
@@ -390,6 +395,7 @@ begin
         'position_name', p.position_name,
         'max_votes', p.max_votes,
         'rank_order', p.rank_order,
+        'plurality_at_large', p.plurality_at_large,
         'abstain_count', coalesce(ac.abstained, 0),
         'candidates', coalesce((
           select jsonb_agg(jsonb_build_object(

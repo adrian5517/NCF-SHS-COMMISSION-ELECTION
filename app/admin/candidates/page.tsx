@@ -27,10 +27,11 @@ export default function CandidatesPage() {
   const [electionId, setElectionId] = useState('')
   const [positions, setPositions] = useState<Position[]>([])
   const [candidates, setCandidates] = useState<Candidate[]>([])
-  const [posForm, setPosForm] = useState<{ id?: string; position_name: string; max_votes: number; rank_order: number; eligible_grade_levels: string[] } | null>(null)
+  const [posForm, setPosForm] = useState<{ id?: string; position_name: string; max_votes: number; rank_order: number; eligible_grade_levels: string[]; plurality_at_large: boolean } | null>(null)
   const [candForm, setCandForm] = useState<(typeof emptyCandidate & { id?: string; position_id: string }) | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [gradeFilter, setGradeFilter] = useState('all')
 
   useEffect(() => {
     createClient()
@@ -84,13 +85,20 @@ export default function CandidatesPage() {
           <h1 className="text-3xl font-bold">Positions & Candidates</h1>
           <p className="mt-1 text-sm text-muted-foreground">Build the ballot for an election</p>
         </div>
-        <select className={`${field} w-auto`} value={electionId} onChange={(e) => setElectionId(e.target.value)}>
-          {elections.map((el) => (
-            <option key={el.id} value={el.id}>
-              {el.title}
-            </option>
-          ))}
-        </select>
+        <div className="flex flex-wrap items-center gap-3">
+          <select className={`${field} w-auto`} value={gradeFilter} onChange={(e) => setGradeFilter(e.target.value)}>
+            <option value="all">All grades</option>
+            <option value="Grade 11">Grade 11</option>
+            <option value="Grade 12">Grade 12</option>
+          </select>
+          <select className={`${field} w-auto`} value={electionId} onChange={(e) => setElectionId(e.target.value)}>
+            {elections.map((el) => (
+              <option key={el.id} value={el.id}>
+                {el.title}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {error && <p className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
@@ -99,7 +107,7 @@ export default function CandidatesPage() {
         <div className="mt-6 space-y-6">
           <Button
             variant="outline"
-            onClick={() => setPosForm({ position_name: '', max_votes: 1, rank_order: positions.length + 1, eligible_grade_levels: [] })}
+            onClick={() => setPosForm({ position_name: '', max_votes: 1, rank_order: positions.length + 1, eligible_grade_levels: [], plurality_at_large: false })}
           >
             <Plus data-icon="inline-start" /> Add position
           </Button>
@@ -210,6 +218,20 @@ export default function CandidatesPage() {
                   ))}
                 </div>
               </div>
+              <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-border bg-background/40 px-3 py-2.5 text-sm sm:col-span-4">
+                <input
+                  type="checkbox"
+                  checked={posForm.plurality_at_large}
+                  onChange={(e) => setPosForm({ ...posForm, plurality_at_large: e.target.checked })}
+                  className="size-4"
+                />
+                <span>
+                  <span className="font-medium">Plurality-at-large voting</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Voters may choose up to all candidates (no max-votes cap). Use for multi-seat positions like Councilors.
+                  </span>
+                </span>
+              </label>
               <div className="flex gap-2 sm:col-span-4">
                 <Button type="submit" disabled={busy}>
                   Save position
@@ -221,15 +243,22 @@ export default function CandidatesPage() {
             </form>
           )}
 
-          {positions.map((pos) => {
-            const list = candidates.filter((c) => c.position_id === pos.id)
+          {positions
+            .filter(
+              (pos) =>
+                gradeFilter === 'all' ||
+                (pos.eligible_grade_levels ?? []).length === 0 ||
+                (pos.eligible_grade_levels ?? []).includes(gradeFilter),
+            )
+            .map((pos) => {
+              const list = candidates.filter((c) => c.position_id === pos.id)
             return (
               <section key={pos.id} className="glass rounded-2xl p-6">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <h2 className="text-lg font-semibold">{pos.position_name}</h2>
                     <p className="text-xs text-muted-foreground">
-                      Vote for {pos.max_votes} · ballot order {pos.rank_order} ·{' '}
+                      {pos.plurality_at_large ? 'Plurality-at-large' : `Vote for ${pos.max_votes}`} · ballot order {pos.rank_order} ·{' '}
                       {(pos.eligible_grade_levels ?? []).length === 0
                         ? 'open to all grades'
                         : `voters: ${(pos.eligible_grade_levels ?? []).join(', ')}`}
@@ -253,6 +282,7 @@ export default function CandidatesPage() {
                           max_votes: pos.max_votes,
                           rank_order: pos.rank_order,
                           eligible_grade_levels: pos.eligible_grade_levels ?? [],
+                          plurality_at_large: pos.plurality_at_large ?? false,
                         })
                       }
                     >
@@ -330,6 +360,15 @@ export default function CandidatesPage() {
               </section>
             )
           })}
+          {positions.length > 0 && gradeFilter !== 'all' && positions.every(
+            (pos) =>
+              (pos.eligible_grade_levels ?? []).length > 0 &&
+              !(pos.eligible_grade_levels ?? []).includes(gradeFilter),
+          ) && (
+            <div className="glass rounded-2xl p-10 text-center text-sm text-muted-foreground">
+              No positions for {gradeFilter} — set a grade eligibility on a position to see it here.
+            </div>
+          )}
           {positions.length === 0 && !posForm && (
             <div className="glass rounded-2xl p-10 text-center text-sm text-muted-foreground">
               No positions yet — add President, Vice President, Councilors…

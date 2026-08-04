@@ -61,17 +61,17 @@ export function BallotWizard({ ballot, studentName }: { ballot: Ballot; studentN
     toastTimer.current = setTimeout(() => setToast(''), 2500)
   }
 
-  function toggle(positionId: string, candidateId: string, maxVotes: number) {
+  function toggle(positionId: string, candidateId: string, maxVotes: number, cap: number) {
     setSelections((prev) => {
       const current = prev[positionId] ?? []
       if (current.includes(candidateId)) {
         return { ...prev, [positionId]: current.filter((id) => id !== candidateId) }
       }
-      if (maxVotes === 1) {
+      if (cap === 1) {
         return { ...prev, [positionId]: [candidateId] }
       }
-      if (current.length >= maxVotes) {
-        showToast(`You can only choose ${maxVotes} for this position.`)
+      if (current.length >= cap) {
+        showToast(`You can only choose ${cap} for this position.`)
         return prev
       }
       return { ...prev, [positionId]: [...current, candidateId] }
@@ -219,15 +219,23 @@ export function BallotWizard({ ballot, studentName }: { ballot: Ballot; studentN
             >
               <h1 className="text-3xl font-bold sm:text-4xl">{position.position_name}</h1>
               <p className="mt-1.5 text-muted-foreground">
-                {position.max_votes === 1
-                  ? 'Tap one candidate to choose.'
-                  : `Choose up to ${position.max_votes} candidates. (${selectedHere.length}/${position.max_votes} selected)`}
+                {(() => {
+                  const cap = position.plurality_at_large
+                    ? position.candidates.length
+                    : Math.min(position.max_votes, position.candidates.length)
+                  return cap <= 1
+                    ? 'Tap one candidate to choose.'
+                    : `Choose up to ${cap} candidates. (${selectedHere.length}/${cap} selected)`
+                })()}
               </p>
 
               <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
                 {position.candidates.map((c, i) => {
                   const selected = selectedHere.includes(c.id)
                   const accent = c.party_color || 'var(--primary)'
+                  const cap = position.plurality_at_large
+                    ? position.candidates.length
+                    : Math.min(position.max_votes, position.candidates.length)
                   return (
                     <motion.button
                       key={c.id}
@@ -236,7 +244,7 @@ export function BallotWizard({ ballot, studentName }: { ballot: Ballot; studentN
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.05, duration: 0.3, ease: 'easeOut' }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={() => toggle(position.id, c.id, position.max_votes)}
+                      onClick={() => toggle(position.id, c.id, position.max_votes, cap)}
                       aria-pressed={selected}
                       className={`glass group relative flex flex-col overflow-hidden rounded-3xl text-left transition-all duration-200 ${
                         selected ? 'ring-4 ring-primary' : 'hover:-translate-y-1 hover:shadow-xl'

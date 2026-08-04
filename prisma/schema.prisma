@@ -46,6 +46,7 @@ model Position {
   max_votes            Int      @default(1)
   rank_order           Int      @default(0)
   eligible_grade_levels String[]
+  plurality_at_large   Boolean  @default(false)
 
   election          Election          @relation(fields: [election_id], references: [id], onDelete: Cascade)
   candidates        Candidate[]
