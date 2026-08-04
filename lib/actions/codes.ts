@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { randomBytes } from 'node:crypto'
-import { createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { logAudit, requireRole } from '@/lib/actions/staff'
 import type { ActionResult } from '@/lib/types'
 
@@ -141,7 +141,7 @@ export async function resetElectionVotes(
   electionId: string,
 ): Promise<ActionResult<{ votesDeleted: number; studentsReset: number }>> {
   await requireRole('admin')
-  const supabase = createAdminClient()
+  const supabase = await createClient()
 
   const { data, error } = await supabase.rpc('reset_election_votes', { p_election_id: electionId })
   if (error) return { ok: false, error: error.message }

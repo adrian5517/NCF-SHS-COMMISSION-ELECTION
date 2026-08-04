@@ -58,6 +58,8 @@ export default function CodesPage() {
   const [busy, setBusy] = useState(false)
   const [resetting, setResetting] = useState(false)
   const [message, setMessage] = useState('')
+  const [confirmingReset, setConfirmingReset] = useState(false)
+  const [typedTitle, setTypedTitle] = useState('')
   const [page, setPage] = useState(0)
   const rowsPerPage = 50
 
@@ -266,23 +268,9 @@ ${rows.join('\n')}
           <Button
             variant="destructive"
             disabled={resetting}
-            onClick={async () => {
-              const typed = prompt(
-                `This permanently deletes ALL votes, abstentions, tallies, and voting codes, then sets EVERY student back to pending.\n\nThis cannot be undone.\n\nType the election title to confirm:`,
-              )
-              if (typed !== election.title) {
-                if (typed !== null) alert('Title did not match — reset cancelled.')
-                return
-              }
-              setResetting(true)
-              const result = await resetElectionVotes(election.id)
-              setResetting(false)
-              setMessage(
-                result.ok
-                  ? `Reset complete: ${result.data?.votesDeleted} votes deleted, ${result.data?.studentsReset} students set back to pending.`
-                  : result.error,
-              )
-              load()
+            onClick={() => {
+              setTypedTitle('')
+              setConfirmingReset(true)
             }}
           >
             <RotateCcw data-icon="inline-start" /> {resetting ? 'Resetting…' : 'Reset votes'}
@@ -520,6 +508,69 @@ ${rows.join('\n')}
           </Button>
         </div>
       </div>
+
+      <AnimatePresence>
+        {confirmingReset && election && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !resetting && setConfirmingReset(false)}
+            />
+            <motion.div
+              className="glass relative w-full max-w-md rounded-3xl p-6 shadow-2xl"
+              initial={{ opacity: 0, scale: 0.95, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 12 }}
+            >
+              <h2 className="text-lg font-semibold text-destructive">Reset votes?</h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                This permanently deletes ALL votes, abstentions, tallies, and voting codes, then sets
+                EVERY student back to pending. This cannot be undone.
+              </p>
+              <label className="mt-4 block text-xs font-medium text-muted-foreground">
+                Type <span className="font-semibold text-foreground">{election.title}</span> to confirm
+              </label>
+              <input
+                autoFocus
+                disabled={resetting}
+                className={`${field} mt-1.5 w-full`}
+                value={typedTitle}
+                onChange={(e) => setTypedTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') setConfirmingReset(false)
+                }}
+                placeholder={election.title}
+              />
+              <div className="mt-5 flex justify-end gap-2">
+                <Button variant="outline" disabled={resetting} onClick={() => setConfirmingReset(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={typedTitle.trim() !== election.title || resetting}
+                  onClick={async () => {
+                    setResetting(true)
+                    const result = await resetElectionVotes(election.id)
+                    setResetting(false)
+                    setMessage(
+                      result.ok
+                        ? `Reset complete: ${result.data?.votesDeleted} votes deleted, ${result.data?.studentsReset} students set back to pending.`
+                        : result.error,
+                    )
+                    setConfirmingReset(false)
+                    load()
+                  }}
+                >
+                  <RotateCcw data-icon="inline-start" /> {resetting ? 'Resetting…' : 'Reset everything'}
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
