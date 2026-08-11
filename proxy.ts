@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  // Student kiosk: guarded by its own signed cookie, never touches Supabase.
   if (pathname.startsWith('/ballot')) {
     if (!request.cookies.get('ncf_student_session')) {
       return NextResponse.redirect(new URL('/vote', request.url))
@@ -11,14 +12,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next()
   }
 
-  const response = await updateSession(request)
-  if (pathname.startsWith('/admin') || pathname.startsWith('/watch')) {
-    const hasAuth = request.cookies.getAll().some((c) => c.name.includes('-auth-token'))
-    if (!hasAuth) {
-      return NextResponse.redirect(new URL('/login', request.url))
-    }
-  }
-  return response
+  // Staff routes: refresh/validate the Supabase session (single refresher),
+  // redirecting to /login when the session is stale or revoked.
+  return updateSession(request)
 }
 
 export const config = {

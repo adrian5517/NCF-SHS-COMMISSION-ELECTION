@@ -1,14 +1,23 @@
 'use server'
 
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import type { ActionResult, Profile } from '@/lib/types'
 
+const AUTH_COOKIE_HINT = '-auth-token'
+
 export async function getProfile(): Promise<Profile | null> {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  let user: { id: string } | null = null
+  try {
+    // A refresh failure (e.g. refresh_token_not_found on a stale session)
+    // must read as "not logged in", never as an unhandled error.
+    const { data } = await supabase.auth.getUser()
+    user = data.user
+  } catch {
+    return null
+  }
   if (!user) return null
   const { data } = await supabase.from('profiles').select('id, full_name, role').eq('id', user.id).single()
   return (data as Profile) ?? null
@@ -59,6 +68,17 @@ export async function staffLogin(_prev: ActionResult | null, formData: FormData)
 
 export async function staffLogout() {
   const supabase = await createClient()
-  await supabase.auth.signOut()
+  try {
+    // scope 'local' keeps this fast and offline; on a dead session signOut
+    // may skip the local cleanup entirely, so we clear the cookies ourselves.
+    await supabase.auth.signOut({ scope: 'local' })
+  } catch {
+    // session may already be dead — cookie cleanup below still runs
+  }
+  const store = await cookies()
+  for (const cookie of store.getAll()) {
+    if (!cookie.name.includes(AUTH_COOKIE_HINT)) continue
+    store.set(cookie.name, '', { maxAge: 0, path: '/' })
+  }
   redirect('/login')
 }
