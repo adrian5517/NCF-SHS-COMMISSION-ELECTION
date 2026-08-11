@@ -2,21 +2,30 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, Send, ShieldCheck, UserRound, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, ClipboardCheck, Send, UserRound, X } from 'lucide-react'
 import { exitBallot, submitBallot } from '@/lib/actions/vote'
 import { Button } from '@/components/ui/button'
-import type { Ballot, BallotCandidate } from '@/lib/types'
+import type { Ballot, BallotCandidate, VotingMechanics } from '@/lib/types'
 
 const IDLE_MS = 60_000
 
-export function BallotWizard({ ballot, studentName }: { ballot: Ballot; studentName: string }) {
+export function BallotWizard({
+  ballot,
+  studentName,
+  votingMechanics,
+}: {
+  ballot: Ballot
+  studentName: string
+  votingMechanics: VotingMechanics
+}) {
   const positions = ballot.positions
   const [step, setStep] = useState(0) // positions.length = review
-  const [showWelcome, setShowWelcome] = useState(true)
+  const [showMechanics, setShowMechanics] = useState(true)
+  const [acknowledged, setAcknowledged] = useState(false)
   const [selections, setSelections] = useState<Record<string, string[]>>({})
   const [toast, setToast] = useState('')
   const [confirmingAbstain, setConfirmingAbstain] = useState(false)
-  const [confirming, setConfirming] = useState(false)
+  const [affirmed, setAffirmed] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
@@ -88,7 +97,6 @@ export function BallotWizard({ ballot, studentName }: { ballot: Ballot; studentN
       const cap = Math.min(overLimit.max_votes, overLimit.candidates.length)
       showToast(`Too many choices for ${overLimit.position_name}. Choose up to ${cap}.`)
       setStep(positions.findIndex((position) => position.id === overLimit.id))
-      setConfirming(false)
       return
     }
     submitInFlightRef.current = true
@@ -101,7 +109,6 @@ export function BallotWizard({ ballot, studentName }: { ballot: Ballot; studentN
       submitInFlightRef.current = false
       return
     }
-    setConfirming(false)
     setDone(true)
   }
 
@@ -137,68 +144,101 @@ export function BallotWizard({ ballot, studentName }: { ballot: Ballot; studentN
     )
   }
 
+  if (showMechanics) {
+    const firstName = studentName.split(' ')[0]
+    return (
+      <div className="dark bg-aurora min-h-screen bg-background text-foreground">
+        <div className="flex min-h-screen items-center justify-center px-4 py-8 sm:px-6">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: 'easeOut' }}
+            className="glass w-full max-w-2xl rounded-3xl p-6 sm:p-10"
+          >
+            {/* Header */}
+            <div className="flex flex-col items-center text-center">
+              {ballot.election.logo_url && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={ballot.election.logo_url}
+                  alt={ballot.election.title}
+                  className="size-16 rounded-2xl object-cover sm:size-20"
+                />
+              )}
+              <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground sm:text-xs">
+                NCF BED–SHS Commission on Elections (COMELEC)
+              </p>
+              <h1 className="mt-1.5 text-2xl font-extrabold tracking-tight sm:text-3xl">
+                {votingMechanics.heading}
+              </h1>
+            </div>
+
+            {/* Greeting + intro */}
+            <p className="mt-5 text-sm leading-relaxed text-muted-foreground sm:text-base">
+              Hi <span className="font-semibold text-foreground">{firstName}</span>! Please review the
+              guidelines before casting your ballot.
+            </p>
+            <p className="mt-3 text-sm leading-relaxed sm:text-base">{votingMechanics.intro}</p>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground sm:text-base">
+              {votingMechanics.preface}
+            </p>
+
+            {/* Guidelines */}
+            <ul className="mt-6 space-y-3.5">
+              {votingMechanics.guidelines.map((line, i) => (
+                <li key={i} className="flex items-start gap-3.5">
+                  <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary sm:size-8 sm:text-sm">
+                    {i + 1}
+                  </span>
+                  <p className="text-sm leading-relaxed sm:text-base">{line}</p>
+                </li>
+              ))}
+            </ul>
+
+            {/* Consent note */}
+            <p className="mt-6 border-l-2 border-primary/40 pl-4 text-sm leading-relaxed text-muted-foreground italic sm:text-base">
+              {votingMechanics.consentNote}
+            </p>
+
+            {/* Acknowledgment */}
+            <label className="mt-6 flex cursor-pointer items-start gap-3.5 rounded-2xl border border-border bg-background/50 p-4 transition-colors select-none hover:border-primary/50 sm:p-5">
+              <input
+                type="checkbox"
+                checked={acknowledged}
+                onChange={(e) => setAcknowledged(e.target.checked)}
+                className="mt-0.5 size-5 shrink-0 accent-primary sm:size-6"
+              />
+              <span className="text-sm leading-relaxed font-medium sm:text-base">
+                {votingMechanics.acknowledgment}
+              </span>
+            </label>
+
+            {/* CTA */}
+            <Button
+              size="lg"
+              className="mt-6 h-13 w-full text-base sm:h-14 sm:text-lg"
+              disabled={!acknowledged}
+              onClick={() => setShowMechanics(false)}
+            >
+              <ClipboardCheck data-icon="inline-start" /> Let's Vote
+            </Button>
+            {!acknowledged && (
+              <p className="mt-3 text-center text-xs text-muted-foreground">
+                Please acknowledge the voting mechanics to continue.
+              </p>
+            )}
+          </motion.div>
+        </div>
+      </div>
+    )
+  }
+
   const isReview = step >= positions.length
   const position = positions[Math.min(step, positions.length - 1)]
   const selectedHere = selections[position?.id ?? ''] ?? []
 
   return (
     <div className="dark bg-aurora min-h-screen bg-background pb-32 text-foreground">
-      {/* welcome */}
-      <AnimatePresence>
-        {showWelcome && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.85, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              transition={{ type: 'spring', stiffness: 280, damping: 22 }}
-              className="glass w-full max-w-md rounded-3xl bg-popover p-8 text-center sm:p-10"
-            >
-              <motion.div
-                initial={{ scale: 0, rotate: -15 }}
-                animate={{ scale: 1, rotate: 0 }}
-                transition={{ delay: 0.15, type: 'spring', stiffness: 300, damping: 18 }}
-                className="mx-auto flex size-20 items-center justify-center rounded-full bg-primary/15"
-              >
-                <ShieldCheck className="size-10 text-primary" />
-              </motion.div>
-              <motion.h2
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.25, duration: 0.4 }}
-                className="mt-6 text-3xl font-bold"
-              >
-                Vote Wisely!
-              </motion.h2>
-              <motion.p
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.35, duration: 0.4 }}
-                className="mt-3 text-sm text-muted-foreground"
-              >
-                Hi {studentName.split(' ')[0]}! Your identity stays private and your ballot is anonymous.
-                Take a moment to choose the candidates who will represent {ballot.election.title} best.
-              </motion.p>
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.45, duration: 0.4 }}
-              >
-                <Button size="lg" className="mt-7 h-12 w-full text-base" onClick={() => setShowWelcome(false)}>
-                  Let's Vote <ArrowRight data-icon="inline-end" />
-                </Button>
-              </motion.div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* progress */}
       <header className="sticky top-0 z-20 border-b border-border bg-background/80 px-6 py-4 backdrop-blur-xl">
         <div className="mx-auto flex max-w-4xl items-center justify-between gap-4">
@@ -350,6 +390,38 @@ export function BallotWizard({ ballot, studentName }: { ballot: Ballot; studentN
                   </div>
                 ))}
               </div>
+
+              <div className="mt-8 overflow-hidden rounded-3xl border border-primary/25 bg-primary/5 p-6 sm:p-8">
+                <div className="flex items-center gap-3">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/15">
+                    <ClipboardCheck className="size-5 text-primary" />
+                  </span>
+                  <h2 className="text-xl font-bold sm:text-2xl">{votingMechanics.declarationTitle}</h2>
+                </div>
+                <p className="mt-4 text-sm leading-relaxed text-muted-foreground sm:text-base">
+                  {votingMechanics.declarationIntro}
+                </p>
+                <label className="mt-5 flex cursor-pointer items-start gap-3.5 rounded-2xl border border-border bg-background/60 p-4 transition-colors select-none hover:border-primary/50 sm:p-5">
+                  <input
+                    type="checkbox"
+                    checked={affirmed}
+                    onChange={(e) => setAffirmed(e.target.checked)}
+                    className="mt-0.5 size-5 shrink-0 accent-primary sm:size-6"
+                  />
+                  <span className="text-sm leading-relaxed font-semibold sm:text-base">
+                    {votingMechanics.declarationAffirmation}
+                  </span>
+                </label>
+                <p className="mt-5 border-l-2 border-primary/40 pl-4 text-sm leading-relaxed text-muted-foreground italic sm:text-base">
+                  {votingMechanics.declarationSubmitNote}
+                </p>
+              </div>
+
+              {error && (
+                <p role="alert" className="mt-6 rounded-xl bg-destructive/15 px-4 py-3 text-sm font-medium text-destructive">
+                  {error}
+                </p>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -375,8 +447,8 @@ export function BallotWizard({ ballot, studentName }: { ballot: Ballot; studentN
               Next <ArrowRight data-icon="inline-end" />
             </Button>
           ) : (
-            <Button size="lg" className="h-12 px-6 text-base" onClick={() => setConfirming(true)}>
-              <Send data-icon="inline-start" /> Submit my vote
+            <Button size="lg" className="h-12 px-6 text-base" onClick={submit} disabled={!affirmed || submitting}>
+              <Send data-icon="inline-start" /> {submitting ? 'Submitting…' : 'Cast my vote'}
             </Button>
           )}
         </div>
@@ -435,50 +507,6 @@ export function BallotWizard({ ballot, studentName }: { ballot: Ballot; studentN
             className="fixed bottom-24 left-1/2 z-30 -translate-x-1/2 rounded-2xl bg-popover px-5 py-3 text-sm font-medium shadow-lg"
           >
             {toast}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* confirm modal */}
-      <AnimatePresence>
-        {confirming && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-6"
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.92 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.92 }}
-              transition={{ type: 'spring', stiffness: 320, damping: 26 }}
-              className="glass w-full max-w-md rounded-3xl bg-popover p-8 text-center"
-            >
-              <h2 className="text-2xl font-bold">Submit your ballot?</h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Once submitted, your vote is final and cannot be changed.
-              </p>
-              {error && (
-                <p role="alert" className="mt-4 rounded-xl bg-destructive/15 px-4 py-3 text-sm font-medium text-destructive">
-                  {error}
-                </p>
-              )}
-              <div className="mt-6 flex flex-col gap-2.5">
-                <Button
-                  size="lg"
-                  className="h-12 text-base"
-                  onClick={submit}
-                  disabled={submitting}
-                >
-                  {submitting ? 'Submitting…' : error ? 'Retry submit' : 'Yes, submit my vote'}
-                </Button>
-                <Button variant="ghost" size="lg" className="h-12 text-base" onClick={() => setConfirming(false)} disabled={submitting}>
-                  <X data-icon="inline-start" /> Go back
-                </Button>
-              </div>
-            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

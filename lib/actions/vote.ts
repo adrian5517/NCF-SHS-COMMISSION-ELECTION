@@ -4,7 +4,8 @@ import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { clearStudentSession, createStudentSession, getStudentSession } from '@/lib/student-session'
-import type { ActionResult, Ballot } from '@/lib/types'
+import type { ActionResult, Ballot, VotingMechanics } from '@/lib/types'
+import { DEFAULT_VOTING_MECHANICS, normalizeVotingMechanics } from '@/lib/voting-mechanics'
 
 // ponytail: in-memory rate limiters — fine for one school-lab single-instance
 // server; move to Postgres/Redis if this ever runs multi-instance.
@@ -101,7 +102,11 @@ export async function studentLogin(_prev: ActionResult | null, formData: FormDat
   redirect('/ballot')
 }
 
-export async function getBallotForSession(): Promise<{ ballot: Ballot; studentName: string } | null> {
+export async function getBallotForSession(): Promise<{
+  ballot: Ballot
+  studentName: string
+  votingMechanics: VotingMechanics
+} | null> {
   try {
     const session = await getStudentSession()
     if (!session) return null
@@ -116,7 +121,27 @@ export async function getBallotForSession(): Promise<{ ballot: Ballot; studentNa
       const allowedGrades = position.eligible_grade_levels ?? []
       return allowedGrades.length === 0 || !session.gradeLevel || allowedGrades.includes(session.gradeLevel)
     })
-    return { ballot: { ...ballot, positions: visiblePositions }, studentName: session.studentName }
+
+    // Per-election mechanics are optional (column may not exist yet on older
+    // deployments) — never fail the ballot load over missing copy.
+    let votingMechanics: VotingMechanics = DEFAULT_VOTING_MECHANICS
+    try {
+      const adminSupabase = createAdminClient()
+      const { data: mechanicsRow } = await adminSupabase
+        .from('elections')
+        .select('voting_mechanics')
+        .eq('id', session.electionId)
+        .single()
+      votingMechanics = normalizeVotingMechanics(mechanicsRow?.voting_mechanics)
+    } catch {
+      votingMechanics = DEFAULT_VOTING_MECHANICS
+    }
+
+    return {
+      ballot: { ...ballot, positions: visiblePositions },
+      studentName: session.studentName,
+      votingMechanics,
+    }
   } catch {
     return null
   }

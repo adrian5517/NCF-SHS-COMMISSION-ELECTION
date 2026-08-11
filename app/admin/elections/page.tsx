@@ -8,7 +8,8 @@ import { deleteElection, saveElection, setElectionStatus, toggleHideResults } fr
 import { uploadImage } from '@/lib/upload'
 import { StatusPill } from '@/components/status-pill'
 import { Button } from '@/components/ui/button'
-import type { Election } from '@/lib/types'
+import { DEFAULT_VOTING_MECHANICS, normalizeVotingMechanics } from '@/lib/voting-mechanics'
+import type { Election, VotingMechanics } from '@/lib/types'
 
 const field =
   'w-full rounded-xl border border-input bg-background/60 px-3 py-2.5 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/40'
@@ -20,15 +21,25 @@ function toLocalInput(iso: string) {
   return d.toISOString().slice(0, 16)
 }
 
-const emptyForm = { title: '', description: '', logo_url: '', start_date: '', end_date: '' }
+const emptyForm = {
+  title: '',
+  description: '',
+  logo_url: '',
+  start_date: '',
+  end_date: '',
+  voting_mechanics: { ...DEFAULT_VOTING_MECHANICS },
+}
+
+type ElectionForm = typeof emptyForm & { id?: string }
 
 export default function ElectionsPage() {
   const [elections, setElections] = useState<Election[]>([])
-  const [form, setForm] = useState<typeof emptyForm & { id?: string }>(emptyForm)
+  const [form, setForm] = useState<ElectionForm>(emptyForm)
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [actionError, setActionError] = useState('')
+  const [showMechanicsEditor, setShowMechanicsEditor] = useState(false)
 
   const load = useCallback(async () => {
     const supabase = createClient()
@@ -55,6 +66,7 @@ export default function ElectionsPage() {
       logo_url: form.logo_url || null,
       start_date: new Date(form.start_date).toISOString(),
       end_date: new Date(form.end_date).toISOString(),
+      voting_mechanics: normalizeVotingMechanics(form.voting_mechanics),
     })
     setBusy(false)
     if (!result.ok) return setError(result.error)
@@ -80,6 +92,7 @@ export default function ElectionsPage() {
         <Button
           onClick={() => {
             setForm(emptyForm)
+            setShowMechanicsEditor(false)
             setEditing(true)
           }}
         >
@@ -206,8 +219,197 @@ export default function ElectionsPage() {
                   <p className="text-xs text-muted-foreground">
                     {new Date(el.start_date).toLocaleString()} — {new Date(el.end_date).toLocaleString()}
                   </p>
+            </div>
+
+            <div className="sm:col-span-2">
+              <button
+                type="button"
+                onClick={() => setShowMechanicsEditor((v) => !v)}
+                className="flex w-full items-center justify-between rounded-xl border border-dashed border-border px-4 py-3 text-left text-sm font-semibold hover:border-ring/50 hover:bg-muted/40"
+              >
+                <span>Voting mechanics + declaration (shown before the ballot / before submitting)</span>
+                <span className="text-muted-foreground">{showMechanicsEditor ? '−' : '+'}</span>
+              </button>
+              {showMechanicsEditor && (
+                <div className="mt-4 grid gap-4">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium">Intro</label>
+                    <textarea
+                      rows={2}
+                      className={field}
+                      value={form.voting_mechanics.intro}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          voting_mechanics: { ...form.voting_mechanics, intro: e.target.value },
+                        })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium">Heading</label>
+                    <input
+                      className={field}
+                      value={form.voting_mechanics.heading}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          voting_mechanics: { ...form.voting_mechanics, heading: e.target.value },
+                        })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium">Preface</label>
+                    <textarea
+                      rows={2}
+                      className={field}
+                      value={form.voting_mechanics.preface}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          voting_mechanics: { ...form.voting_mechanics, preface: e.target.value },
+                        })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium">Guidelines (one per line)</label>
+                    <textarea
+                      rows={4}
+                      className={`${field} font-mono text-xs`}
+                      placeholder={'One guideline per line…'}
+                      value={form.voting_mechanics.guidelines.join('\n')}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          voting_mechanics: {
+                            ...form.voting_mechanics,
+                            guidelines: e.target.value.split('\n'),
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium">Consent note</label>
+                    <textarea
+                      rows={2}
+                      className={field}
+                      value={form.voting_mechanics.consentNote}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          voting_mechanics: { ...form.voting_mechanics, consentNote: e.target.value },
+                        })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium">Acknowledgment statement</label>
+                    <textarea
+                      rows={2}
+                      className={field}
+                      value={form.voting_mechanics.acknowledgment}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          voting_mechanics: {
+                            ...form.voting_mechanics,
+                            acknowledgment: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 p-4">
+                    <p className="mb-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                      Statement of Declaration (shown on the review step)
+                    </p>
+                    <div className="grid gap-4">
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium">Declaration title</label>
+                        <input
+                          className={field}
+                          value={form.voting_mechanics.declarationTitle}
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              voting_mechanics: {
+                                ...form.voting_mechanics,
+                                declarationTitle: e.target.value,
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium">Declaration intro</label>
+                        <textarea
+                          rows={3}
+                          className={field}
+                          value={form.voting_mechanics.declarationIntro}
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              voting_mechanics: {
+                                ...form.voting_mechanics,
+                                declarationIntro: e.target.value,
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium">Affirmation label (checkbox)</label>
+                        <input
+                          className={field}
+                          value={form.voting_mechanics.declarationAffirmation}
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              voting_mechanics: {
+                                ...form.voting_mechanics,
+                                declarationAffirmation: e.target.value,
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium">Submit note</label>
+                        <textarea
+                          rows={3}
+                          className={field}
+                          value={form.voting_mechanics.declarationSubmitNote}
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              voting_mechanics: {
+                                ...form.voting_mechanics,
+                                declarationSubmitNote: e.target.value,
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="justify-self-start"
+                    onClick={() =>
+                      setForm({ ...form, voting_mechanics: { ...DEFAULT_VOTING_MECHANICS } })
+                    }
+                  >
+                    Restore default wording
+                  </Button>
                 </div>
-              </div>
+              )}
+            </div>
+          </div>
               <div className="flex flex-wrap gap-1.5">
                 {el.status !== 'ongoing' && el.status !== 'archived' && (
                   <Button size="sm" onClick={() => act(() => setElectionStatus(el.id, 'ongoing'))}>
@@ -247,7 +449,9 @@ export default function ElectionsPage() {
                       logo_url: el.logo_url ?? '',
                       start_date: toLocalInput(el.start_date),
                       end_date: toLocalInput(el.end_date),
+                      voting_mechanics: normalizeVotingMechanics(el.voting_mechanics),
                     })
+                    setShowMechanicsEditor(false)
                     setEditing(true)
                   }}
                 >

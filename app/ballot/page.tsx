@@ -6,5 +6,11 @@ export default async function BallotPage() {
   const session = await getBallotForSession()
   if (!session) redirect('/vote')
 
-  return <BallotWizard ballot={session.ballot} studentName={session.studentName} />
+  return (
+    <BallotWizard
+      ballot={session.ballot}
+      studentName={session.studentName}
+      votingMechanics={session.votingMechanics}
+    />
+  )
 }

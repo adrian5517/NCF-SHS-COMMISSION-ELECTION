@@ -16,7 +16,26 @@ export interface Election {
   end_date: string
   status: ElectionStatus
   hide_live_results: boolean
+  voting_mechanics: VotingMechanics | null
   created_at: string
+}
+
+/** Pre-vote "Voting Mechanics" gate content, configurable per election.
+ * Stored as a JSONB column on `elections`; `normalizeVotingMechanics`
+ * fills any missing field from the shared default so the kiosk always
+ * renders a complete screen. */
+export interface VotingMechanics {
+  intro: string
+  heading: string
+  preface: string
+  guidelines: string[]
+  consentNote: string
+  acknowledgment: string
+  /** Review-step declaration shown after the ballot summary. */
+  declarationTitle: string
+  declarationIntro: string
+  declarationAffirmation: string
+  declarationSubmitNote: string
 }
 
 export interface Position {

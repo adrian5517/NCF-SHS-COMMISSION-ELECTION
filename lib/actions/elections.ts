@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { logAudit, requireRole } from '@/lib/actions/staff'
-import type { ActionResult, ElectionStatus } from '@/lib/types'
+import { DEFAULT_VOTING_MECHANICS } from '@/lib/voting-mechanics'
+import type { ActionResult, ElectionStatus, VotingMechanics } from '@/lib/types'
 
 function fail(error: unknown, fallback: string): ActionResult {
   const message = error instanceof Error ? error.message : fallback
@@ -27,6 +28,7 @@ export async function saveElection(form: {
   logo_url?: string | null
   start_date: string
   end_date: string
+  voting_mechanics?: VotingMechanics | null
 }): Promise<ActionResult> {
   await requireRole('admin')
   const supabase = await createClient()
@@ -36,6 +38,7 @@ export async function saveElection(form: {
     logo_url: form.logo_url ?? null,
     start_date: form.start_date,
     end_date: form.end_date,
+    voting_mechanics: form.voting_mechanics ?? DEFAULT_VOTING_MECHANICS,
   }
   const { error } = form.id
     ? await supabase.from('elections').update(row).eq('id', form.id)
