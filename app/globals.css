@@ -167,3 +167,41 @@
   .no-print { display: none !important; }
   body { background: white !important; color: black !important; }
 }
+
+/* ── Projector grid responsive tiers ────────────────────────────────────────
+   Container queries on each .projector-card article.
+   The layout tier switches based on the actual rendered card dimensions.
+
+   Tier A — photo-card  : card ≥ 80px tall & ≥ 120px wide
+   Tier B — compact     : card ≥ 40px tall & ≥ 70px wide
+   Tier C — minimal     : everything smaller (default)
+────────────────────────────────────────────────────────────────────────────*/
+
+article.projector-card {
+  container-type: size;
+  container-name: pcard;
+  /* Height of the vote-bar strip in photo-card mode */
+  --bar-h: clamp(22px, 2.6vw, 32px);
+}
+
+/* ── Default: minimal (name + bar, no image) ────── */
+article.projector-card .pc-photo { display: none !important; }
+article.projector-card .pc-bar   { display: none !important; }
+article.projector-card .cc-row   { display: none !important; }
+article.projector-card .mn-row   { display: flex !important; }
+
+/* ── Compact tier ───────────────────────────────── */
+@container pcard (min-height: 40px) and (min-width: 70px) {
+  article.projector-card .pc-photo { display: none !important; }
+  article.projector-card .pc-bar   { display: none !important; }
+  article.projector-card .cc-row   { display: flex !important; }
+  article.projector-card .mn-row   { display: none !important; }
+}
+
+/* ── Photo-card tier ────────────────────────────── */
+@container pcard (min-height: 80px) and (min-width: 120px) {
+  article.projector-card .pc-photo { display: block !important; }
+  article.projector-card .pc-bar   { display: flex !important; }
+  article.projector-card .cc-row   { display: none !important; }
+  article.projector-card .mn-row   { display: none !important; }
+}

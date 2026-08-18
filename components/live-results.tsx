@@ -7,6 +7,9 @@ import { EyeOff, LayoutGrid, List, Trophy, UserRound } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 
+/** Candidate names that represent an abstain slot — exclude from photo cards. */
+const ABSTAIN_RE = /^abstain$/i
+
 export interface LiveStats {
   ok: boolean
   election: { id: string; title: string; status: string; hide_live_results: boolean; end_date: string }
@@ -272,35 +275,53 @@ export function ResultsBoard({
           const totalVotes = pos.candidates.reduce((sum, c) => sum + c.votes, 0)
 
           if (view === 'cards') {
+            const realCandidates = pos.candidates.filter((c) => !ABSTAIN_RE.test(c.candidate_name))
+            const abstainCount = pos.abstain_count ?? 0
+            const cardTotal = realCandidates.reduce((sum, c) => sum + c.votes, 0)
+            const abstainShare = cardTotal + abstainCount > 0
+              ? Math.round((abstainCount / (cardTotal + abstainCount)) * 100)
+              : 0
+
             return (
               <div key={pos.position_id} className="glass rounded-2xl p-6">
                 <div className="flex items-baseline justify-between">
                   <h3 className={`font-semibold ${big ? 'text-2xl' : 'text-lg'}`}>{pos.position_name}</h3>
                   <span className="text-right text-xs text-muted-foreground">
                     vote for {pos.max_votes}
-                    {pos.abstain_count > 0 && (
-                      <>
-                        <br />
-                        {pos.abstain_count} abstained
-                      </>
-                    )}
                   </span>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                  {pos.candidates.map((c, i) => (
+                  {realCandidates.map((c, i) => (
                     <CandidateCard
                       key={c.id}
                       candidate={c}
                       leading={i < pos.max_votes && c.votes > 0}
-                      shareOfVotes={totalVotes ? Math.round((c.votes / totalVotes) * 100) : 0}
+                      shareOfVotes={cardTotal ? Math.round((c.votes / cardTotal) * 100) : 0}
                       big={big}
                       index={i}
                     />
                   ))}
-                  {pos.candidates.length === 0 && (
+                  {realCandidates.length === 0 && (
                     <p className="col-span-full text-sm text-muted-foreground">No candidates yet.</p>
                   )}
                 </div>
+                {/* Abstain progress bar */}
+                {abstainCount > 0 && (
+                  <div className="mt-4 rounded-xl bg-muted/30 px-4 py-2.5">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span className="font-medium uppercase tracking-wider">Abstain</span>
+                      <span className="tabular-nums font-semibold">{abstainCount} · {abstainShare}%</span>
+                    </div>
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
+                      <motion.div
+                        className="h-full rounded-full bg-muted-foreground/40"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${abstainShare}%` }}
+                        transition={{ duration: 0.6, ease: 'easeOut' }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )
           }
